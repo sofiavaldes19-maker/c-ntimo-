@@ -1,5 +1,5 @@
 // Guarda el juego en el teléfono para que funcione sin internet.
-const VERSION = "centimo-v1";
+const VERSION = "centimo-v2";
 const ARCHIVOS = [
   "./",
   "./index.html",
@@ -8,7 +8,9 @@ const ARCHIVOS = [
   "./iconos/icono-512.png",
   "./iconos/icono-maskable-512.png",
   "./iconos/apple-touch-icon.png",
-  "./iconos/favicon-32.png"
+  "./iconos/favicon-32.png",
+  "./lib/peerjs.min.js",
+  "./lib/qrcode.js"
 ];
 
 self.addEventListener("install", e => {
@@ -25,6 +27,11 @@ self.addEventListener("activate", e => {
 
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
+  // Solo guarda los archivos del juego y las fuentes; la conexión en línea pasa directo.
+  const url = new URL(e.request.url);
+  const propio = url.origin === self.location.origin;
+  const fuentes = url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com";
+  if (!propio && !fuentes) return;
   // Primero intenta internet (para recibir actualizaciones); si no hay, usa lo guardado.
   e.respondWith(
     fetch(e.request)

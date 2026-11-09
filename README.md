@@ -14,11 +14,19 @@ También hay un botón **Instalar app** en la pantalla de inicio del juego.
 
 ## Cómo jugar
 
-1. Abre `index.html` en cualquier navegador (celular o computador). No necesita instalación.
-2. Elige cuántos juegan (**de 2 a 10**) y escribe sus nombres.
-   - **Persona**: se pasan el mismo dispositivo por turnos. Antes de cada turno aparece una pantalla "Pasa el dispositivo a…" para que nadie vea cartas ajenas.
-   - **Compu**: un jugador automático, útil si son pocos.
-3. Toca **Empezar partida**.
+### Cada jugador en su celular (en línea)
+
+1. Una persona abre Céntimo y toca **Crear sala**. Su celular será el anfitrión: debe mantener Céntimo abierto mientras juegan.
+2. Aparece un código de 4 letras, un QR y un link. Los demás escanean el QR, abren el link o tocan **Unirme a una sala** y escriben el código.
+3. Cuando estén todos (de 2 a 10), el anfitrión toca **Empezar**. Si son pocos, puede agregar jugadores de la compu.
+
+Cada uno ve solo sus propias cartas. Si alguien pierde la conexión, la compu juega sus turnos hasta que vuelva; al abrir de nuevo el link, vuelve solo a su sala.
+
+La conexión es directa entre los celulares (PeerJS, incluido en `lib/`), así que no hace falta ningún servidor propio. Necesita internet y que el juego esté publicado en una dirección `https://` (por ejemplo, GitHub Pages).
+
+### Un solo dispositivo
+
+Toca **Un solo dispositivo**, elige cuántos juegan y si cada uno es **Persona** o **Compu**. Las personas se pasan el celular por turnos; antes de cada turno aparece "Pasa el dispositivo a…" para que nadie vea cartas ajenas. Este modo funciona sin internet.
 
 Las cartas que puedes jugar aparecen resaltadas en dorado. Si no puedes jugar ninguna, toca el mazo o **Robar carta y pasar**.
 

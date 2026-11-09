@@ -6,7 +6,7 @@
 <title>Céntimo</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="theme-color" content="#151a2c">
-<meta name="description" content="Céntimo: juego de cartas de finanzas personales para 2 a 10 jugadores.">
+<meta name="description" content="Céntimo: juego de cartas de finanzas personales para 2 a 10 jugadores, cada uno en su celular.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="iconos/favicon-32.png">
 <link rel="apple-touch-icon" href="iconos/apple-touch-icon.png">
@@ -231,21 +231,76 @@ h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Modo en línea ---------- */
+.opciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.opcion {
+  text-align: left; display: grid; gap: 6px; align-content: start; padding: 18px; border-radius: 16px;
+  background: #0f1322cc; border: 1px solid var(--linea); min-height: 120px;
+}
+.opcion:hover { border-color: var(--suave); }
+.opcion b { font-family: var(--display); font-size: 22px; font-weight: 800; }
+.opcion span { color: var(--suave); font-size: 15px; }
+.opcion.destacada { border-color: var(--oro); box-shadow: 0 0 0 1px var(--oro); }
+.opcion.destacada b { color: var(--oro); }
+.retomar { display: flex; gap: 10px; flex-wrap: wrap; }
+.campo { display: grid; gap: 6px; }
+.campo label { font-weight: 700; font-size: 14px; color: var(--suave); }
+.campo input {
+  background: var(--mesa); border: 1px solid var(--linea); border-radius: 12px; padding: 12px 14px;
+  color: var(--texto); font: inherit; font-size: 18px; font-weight: 600; width: 100%;
+}
+.campo input.codigo-in { font-family: var(--display); font-size: 32px; letter-spacing: .3em; text-transform: uppercase; text-align: center; }
+.error { background: #3b1714; border: 1px solid var(--gusto); color: #ffd9d4; border-radius: 12px; padding: 10px 12px; margin: 0; }
+.sala-cab { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
+.codigo { font-family: var(--display); font-weight: 800; font-size: clamp(52px, 15vw, 84px); letter-spacing: .14em; color: var(--oro); line-height: 1; font-variant-numeric: tabular-nums; }
+.qr { background: #fff; padding: 8px; border-radius: 12px; width: 156px; max-width: 100%; line-height: 0; }
+.qr svg { width: 100%; height: auto; }
+.enlace { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.enlace code { background: var(--mesa); border: 1px solid var(--linea); border-radius: 10px; padding: 8px 10px; font-size: 13px; overflow-wrap: anywhere; flex: 1 1 220px; min-width: 0; user-select: all; }
+.lista-sala { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lista-sala li { display: flex; align-items: center; gap: 10px; background: var(--mesa); border: 1px solid var(--linea); border-radius: 12px; padding: 10px 12px; flex-wrap: wrap; }
+.lista-sala .nombre { font-weight: 700; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.punto { width: 10px; height: 10px; border-radius: 50%; background: var(--ahorro); flex: none; }
+.punto.off { background: var(--gusto); }
+.badge.tu { background: var(--oro); color: var(--oro-tinta); }
+.badge.off { background: var(--gusto); color: #fff; }
+.badge.anfitrion { background: #3a4470; color: #dfe3f5; }
+.red-aviso { background: #3b2a08; border: 1px solid var(--oro); color: #ffe7b0; border-radius: 12px; padding: 8px 12px; font-size: 14px; font-weight: 600; }
+.esperando { display: flex; align-items: center; gap: 10px; color: var(--suave); }
+.esperando::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--oro); border-right-color: transparent; animation: gira 1s linear infinite; flex: none; }
+@keyframes gira { to { transform: rotate(360deg); } }
+.turno-tuyo { color: var(--oro); }
+@media (max-width: 560px) {
+  .sala-cab { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
 <div id="capa"></div>
 
+<script src="lib/peerjs.min.js"></script>
+<script src="lib/qrcode.js"></script>
 <script>
 "use strict";
+/* =================================================================
+   Céntimo — juego de cartas de finanzas personales
+   Modos: un solo dispositivo, o en línea (cada jugador en su celular).
+   En línea, el celular que crea la sala lleva la partida y envía a
+   cada jugador solo lo que puede ver (sus cartas y la mesa).
+   ================================================================= */
+
+const URL_PUBLICA = "https://sofiavaldes19-maker.github.io/centimo/";
+
 /* ================= Datos del mazo ================= */
 const COLORES = {
-  g: { nombre: "Ahorro", corto: "Verde", desc: "te da escudo" },
-  b: { nombre: "Necesidades", corto: "Azul", desc: "se pagan primero" },
-  r: { nombre: "Gustos", corto: "Rojo", desc: "valen el doble" },
-  y: { nombre: "Ingresos", corto: "Amarillo", desc: "sueldo y extras" }
+  g: { nombre: "Ahorro", corto: "Verde" },
+  b: { nombre: "Necesidades", corto: "Azul" },
+  r: { nombre: "Gustos", corto: "Rojo" },
+  y: { nombre: "Ingresos", corto: "Amarillo" }
 };
+const CODIGOS_COLOR = ["g", "b", "r", "y"];
 const CAT_SINGULAR = { g: "Ahorro", b: "Necesidad", r: "Gusto", y: "Ingreso", k: "Comodín" };
 const GASTOS = {
   g: ["Alcancía", "Monedas sueltas", "Cuenta de ahorro", "Ahorro automático", "Fondo de emergencia", "Depósito a plazo", "Meta de viaje", "Ahorro para estudios", "Colchón financiero"],
@@ -254,18 +309,18 @@ const GASTOS = {
   y: ["Venta de algo usado", "Propina", "Clases particulares", "Mesada", "Turno extra", "Trabajo freelance", "Beca", "Práctica pagada", "Sueldo"]
 };
 const ESPECIALES = {
-  imp:    { nombre: "Imprevisto", simbolo: "+2", corto: "Roba 2 y pierde turno", efecto: "El siguiente roba 2 y pierde su turno" },
-  cong:   { nombre: "Congelar cuenta", simbolo: "⊘", corto: "Pierde turno", efecto: "El siguiente pierde su turno" },
-  camb:   { nombre: "Cambio de plan", simbolo: "⇄", corto: "Cambia el sentido", efecto: "Cambia el sentido del juego" },
-  sueldo: { nombre: "Sueldo extra", simbolo: "★", corto: "Elige color", efecto: "Eliges el color que sigue" },
-  deuda:  { nombre: "Deuda", simbolo: "+4", corto: "Roba 4 · elige color", efecto: "Eliges color; el siguiente roba 4 y pierde su turno" }
+  imp:    { nombre: "Imprevisto", simbolo: "+2", corto: "Roba 2 y pierde turno" },
+  cong:   { nombre: "Congelar cuenta", simbolo: "⊘", corto: "Pierde turno" },
+  camb:   { nombre: "Cambio de plan", simbolo: "⇄", corto: "Cambia el sentido" },
+  sueldo: { nombre: "Sueldo extra", simbolo: "★", corto: "Elige color" },
+  deuda:  { nombre: "Deuda", simbolo: "+4", corto: "Roba 4 · elige color" }
 };
 
 let idCarta = 0;
 function crearMazo(copias) {
   const m = [];
   for (let k = 0; k < copias; k++) {
-    for (const c of ["g", "b", "r", "y"]) {
+    for (const c of CODIGOS_COLOR) {
       for (let v = 1; v <= 9; v++) m.push({ id: idCarta++, color: c, tipo: "num", valor: v });
       for (const t of ["imp", "cong", "camb"]) m.push({ id: idCarta++, color: c, tipo: t });
     }
@@ -286,130 +341,129 @@ function puntos(c) {
   const base = c.tipo === "num" ? c.valor : (c.color === "k" ? 15 : 10);
   return c.color === "r" ? base * 2 : base;
 }
-function esc(s) { return String(s).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])); }
-
-/* ================= Estado ================= */
-const S = {
-  pantalla: "inicio",
-  config: [],
-  jugadores: [], mazo: [], descarte: [], turno: 0, sentido: 1, color: "b",
-  visible: false, acusable: null, ultima: null, ronda: 1, bitacora: [], ocupado: false,
-  mensaje: null, nuevaCarta: null
-};
-let reloj = null;
-
-function cargarConfig() {
-  try {
-    const g = JSON.parse(localStorage.getItem("centimo-config") || "null");
-    if (Array.isArray(g) && g.length >= 2) return g.slice(0, 10);
-  } catch (e) { /* sin almacenamiento */ }
-  return [
-    { nombre: "Jugador 1", bot: false }, { nombre: "Jugador 2", bot: false },
-    { nombre: "Jugador 3", bot: false }, { nombre: "Jugador 4", bot: false },
-    { nombre: "Jugador 5", bot: false }, { nombre: "Jugador 6", bot: false }
-  ];
-}
-function guardarConfig() { try { localStorage.setItem("centimo-config", JSON.stringify(S.config)); } catch (e) { /* nada */ } }
-S.config = cargarConfig();
-
-const $app = document.getElementById("app");
-const $capa = document.getElementById("capa");
-const actual = () => S.jugadores[S.turno];
-const humanos = () => S.jugadores.filter(j => !j.bot).length;
-const tope = () => S.descarte[S.descarte.length - 1];
-function sig(pasos) { const n = S.jugadores.length; return (((S.turno + S.sentido * pasos) % n) + n) % n; }
-function anotar(t) { S.bitacora.unshift(t); S.bitacora.length = Math.min(S.bitacora.length, 40); }
-
-function puedeJugar(c) {
-  if (c.color === "k") return true;
-  if (c.color === S.color) return true;
-  const t = tope();
+function combina(c, t, color) {
+  if (c.color === "k" || c.color === color) return true;
   if (c.tipo === "num" && t.tipo === "num") return c.valor === t.valor;
   return c.tipo !== "num" && c.tipo === t.tipo;
 }
-function tieneNecesidadJugable(j, salvo) {
-  return j.hand.some((c, i) => i !== salvo && c.color === "b" && puedeJugar(c));
+function hayNecesidad(mano, salvo, t, color) {
+  return mano.some((c, i) => i !== salvo && c.color === "b" && combina(c, t, color));
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])); }
+function limpiarNombre(s) { return String(s || "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 16); }
+function azar(n) {
+  const abc = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const a = new Uint32Array(n); crypto.getRandomValues(a);
+  let s = ""; for (const x of a) s += abc[x % abc.length];
+  return s;
+}
+function guardar(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } }
+function leer(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } }
+const enMarco = () => { try { return window.self !== window.top; } catch (e) { return true; } };
+const enLineaPosible = () => !enMarco() && typeof window.Peer === "function";
+
+/* =================================================================
+   MOTOR — corre en el modo local o en el celular anfitrión
+   ================================================================= */
+let G = null;
+let relojMotor = null;
+const actual = () => G.jugadores[G.turno];
+const topeG = () => G.descarte[G.descarte.length - 1];
+function sig(p) { const n = G.jugadores.length; return (((G.turno + G.sentido * p) % n) + n) % n; }
+function anotar(t) { G.bitacora.unshift(t); if (G.bitacora.length > 40) G.bitacora.length = 40; }
+
+function nuevoJugador(nombre, bot, token) {
+  return { nombre, bot: !!bot, token: token || null, conectado: true, hand: [], escudo: false, dijo: false, total: 0, nueva: null };
+}
+function crearEstado(jugadores) {
+  return {
+    fase: "sala", jugadores, mazo: [], descarte: [], turno: 0, sentido: 1, color: "b",
+    acusable: null, ronda: 0, bitacora: [], mensaje: null, mov: 0, resultados: null, ganador: null
+  };
 }
 function robar(j, n) {
   const got = [];
   for (let i = 0; i < n; i++) {
-    if (!S.mazo.length) {
-      if (S.descarte.length <= 1) break;
-      const t = S.descarte.pop();
-      S.mazo = barajar(S.descarte);
-      S.descarte = [t];
+    if (!G.mazo.length) {
+      if (G.descarte.length <= 1) break;
+      const t = G.descarte.pop();
+      G.mazo = barajar(G.descarte);
+      G.descarte = [t];
       anotar("Se acabó el mazo: se barajó la pila de descarte.");
     }
-    got.push(S.mazo.pop());
+    got.push(G.mazo.pop());
   }
   j.hand.push(...got);
   return got;
 }
-
-/* ================= Flujo de la partida ================= */
-function empezarPartida() {
-  S.jugadores = S.config.map((c, i) => ({ nombre: (c.nombre || "").trim() || `Jugador ${i + 1}`, bot: c.bot, hand: [], escudo: false, dijo: false, total: 0 }));
-  S.ronda = 1;
-  empezarRonda();
-}
 function empezarRonda() {
-  clearTimeout(reloj);
-  const n = S.jugadores.length;
+  G.ronda++;
+  const n = G.jugadores.length;
   const copias = n > 5 ? 2 : 1;
-  S.mazo = barajar(crearMazo(copias));
-  S.jugadores.forEach(j => { j.hand = []; j.escudo = false; j.dijo = false; });
-  for (let r = 0; r < 7; r++) S.jugadores.forEach(j => j.hand.push(S.mazo.pop()));
-  let c = S.mazo.pop();
-  while (c.tipo !== "num") { S.mazo.unshift(c); c = S.mazo.pop(); }
-  S.descarte = [c]; S.color = c.color; S.sentido = 1;
-  S.turno = (S.ronda - 1) % n;
-  S.acusable = null; S.bitacora = []; S.ocupado = false; S.mensaje = null; S.ultima = null;
-  anotar(`Ronda ${S.ronda}: cada jugador recibe 7 gastos. Se da vuelta ${nombreCarta(c)}.`);
+  G.mazo = barajar(crearMazo(copias));
+  G.jugadores.forEach(j => { j.hand = []; j.escudo = false; j.dijo = false; j.nueva = null; });
+  for (let r = 0; r < 7; r++) G.jugadores.forEach(j => j.hand.push(G.mazo.pop()));
+  let c = G.mazo.pop();
+  while (c.tipo !== "num") { G.mazo.unshift(c); c = G.mazo.pop(); }
+  G.descarte = [c]; G.color = c.color; G.sentido = 1;
+  G.turno = (G.ronda - 1) % n;
+  G.acusable = null; G.bitacora = []; G.resultados = null; G.ganador = null;
+  G.fase = "juego"; G.mov++;
+  anotar(`Ronda ${G.ronda}: cada jugador recibe 7 gastos. Se da vuelta ${nombreCarta(c)}.`);
   if (copias > 1) anotar(`Son ${n} jugadores: se juega con dos mazos (112 cartas).`);
-  S.pantalla = "juego";
-  iniciarTurno();
-}
-function iniciarTurno() {
-  clearTimeout(reloj);
-  S.visible = false; S.ocupado = false; S.nuevaCarta = null;
-  const j = actual();
-  const previo = S.ultima ? S.ultima.texto + " " : "";
-  const alerta = !!(S.ultima && S.ultima.alerta);
-  S.ultima = null;
-  if (j.bot) {
-    S.mensaje = { texto: `${previo}Ahora juega ${j.nombre}…`, alerta };
-    render();
-    reloj = setTimeout(turnoBot, 1100);
-  } else if (humanos() > 1) {
-    S.mensaje = { texto: `${previo}Turno de ${j.nombre}.`, alerta };
-    render();
-    mostrarCortina();
-  } else {
-    S.visible = true;
-    S.mensaje = { texto: `${previo}Tu turno, ${j.nombre}.`, alerta };
-    render();
-  }
+  G.mensaje = { texto: `Ronda ${G.ronda}. Empieza ${actual().nombre}.` };
+  cambio();
 }
 function acusacionValida() {
-  return S.acusable !== null && S.acusable !== S.turno && S.jugadores[S.acusable].hand.length === 1;
-}
-function acusar() {
-  const t = S.jugadores[S.acusable];
-  robar(t, 2);
-  anotar(`${actual().nombre} pilló a ${t.nombre}: no dijo "¡Último gasto!" y roba 2.`);
-  S.mensaje = { texto: `¡${t.nombre} roba 2 por no decir "¡Último gasto!"!`, alerta: true };
-  S.acusable = null;
-  render();
+  return G.acusable !== null && G.acusable !== G.turno && !!G.jugadores[G.acusable] && G.jugadores[G.acusable].hand.length === 1;
 }
 
+/* Única puerta de entrada para las jugadas (de la pantalla o de la red). Devuelve un error o "". */
+function accion(pi, a) {
+  if (!G || G.fase !== "juego") return "La partida no está en curso.";
+  if (pi !== G.turno) return "Espera tu turno.";
+  const j = G.jugadores[pi];
+  if (a.t === "jugar") {
+    const idx = a.idx;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= j.hand.length) return "Esa carta ya no está en tu mano.";
+    const c = j.hand[idx];
+    if (!combina(c, topeG(), G.color)) return "Esa carta no combina con la del centro.";
+    if (c.color === "k" && !CODIGOS_COLOR.includes(a.color)) return "Elige un color.";
+    jugar(pi, idx, a.color);
+    return "";
+  }
+  if (a.t === "robar") { robarYPasar(pi); return ""; }
+  if (a.t === "ultimo") {
+    if (j.hand.length !== 2) return "Se dice cuando te quedan 2 cartas.";
+    j.dijo = true;
+    G.mensaje = { texto: `${j.nombre}: "¡Último gasto!"` };
+    cambio();
+    return "";
+  }
+  if (a.t === "acusar") {
+    if (!acusacionValida()) return "Ya no se puede acusar.";
+    acusar(pi);
+    return "";
+  }
+  return "Acción desconocida.";
+}
+function acusar(pi) {
+  const t = G.jugadores[G.acusable];
+  robar(t, 2);
+  anotar(`${G.jugadores[pi].nombre} pilló a ${t.nombre}: no dijo "¡Último gasto!" y roba 2.`);
+  G.mensaje = { texto: `¡${t.nombre} roba 2 por no decir "¡Último gasto!"!`, alerta: true };
+  G.acusable = null;
+  cambio();
+}
 function jugar(pi, idx, elegido) {
-  const j = S.jugadores[pi];
+  const j = G.jugadores[pi];
   const c = j.hand[idx];
-  const castigo = c.color === "r" && tieneNecesidadJugable(j, idx);
-  S.acusable = null;
+  const castigo = c.color === "r" && hayNecesidad(j.hand, idx, topeG(), G.color);
+  G.acusable = null;
+  j.nueva = null;
   j.hand.splice(idx, 1);
-  S.descarte.push(c);
-  S.color = c.color === "k" ? elegido : c.color;
+  G.descarte.push(c);
+  G.color = c.color === "k" ? elegido : c.color;
   let txt = `${j.nombre} jugó ${nombreCarta(c)}`;
   if (c.color === "k") txt += ` y eligió ${COLORES[elegido].nombre}`;
   anotar(txt + ".");
@@ -419,57 +473,72 @@ function jugar(pi, idx, elegido) {
     robar(j, 2); alerta = true;
     anotar(`Castigo "Necesidades primero": ${j.nombre} pagó un Gusto teniendo una Necesidad pendiente y roba 2.`);
   }
-  if (j.hand.length === 1 && !j.dijo) S.acusable = pi;
+  if (j.hand.length === 1 && !j.dijo) G.acusable = pi;
   if (j.hand.length === 1 && j.dijo) anotar(`${j.nombre}: "¡Último gasto!"`);
   j.dijo = false;
 
   let salta = false;
-  const ni = sig(1), nj = S.jugadores[ni];
+  const nj = G.jugadores[sig(1)];
   if (c.tipo === "imp" || c.tipo === "deuda") {
     const n = c.tipo === "imp" ? 2 : 4;
     if (nj.escudo) { nj.escudo = false; anotar(`${nj.nombre} usó su escudo de ahorro: no roba ni pierde el turno.`); }
-    else { robar(nj, n); salta = true; anotar(`${nj.nombre} roba ${n} y pierde su turno.`); alerta = true; }
+    else { robar(nj, n); salta = true; alerta = true; anotar(`${nj.nombre} roba ${n} y pierde su turno.`); }
   } else if (c.tipo === "cong") {
     salta = true; anotar(`${nj.nombre} pierde su turno.`);
   } else if (c.tipo === "camb") {
-    S.sentido *= -1;
-    if (S.jugadores.length === 2) salta = true;
+    G.sentido *= -1;
+    if (G.jugadores.length === 2) salta = true;
     anotar("Cambio de plan: el juego cambia de sentido.");
   }
   if (j.hand.length === 0) { terminarRonda(pi); return; }
-  S.ultima = { texto: S.bitacora.slice(0, 3).reverse().join(" "), alerta };
-  S.turno = sig(salta ? 2 : 1);
-  iniciarTurno();
+  G.mensaje = { texto: G.bitacora.slice(0, 3).reverse().join(" "), alerta };
+  G.turno = sig(salta ? 2 : 1);
+  G.mov++;
+  cambio();
 }
-function robarYPasar() {
-  const j = actual();
-  S.acusable = null;
+function robarYPasar(pi) {
+  const j = G.jugadores[pi];
+  G.acusable = null;
   const got = robar(j, 1);
   j.dijo = false;
+  j.nueva = got.length ? got[0].id : null;
   anotar(`${j.nombre} no pudo pagar: robó una carta y pasó.`);
-  S.ultima = { texto: `${j.nombre} robó una carta y pasó.` };
-  if (j.bot || !got.length) { S.turno = sig(1); iniciarTurno(); return; }
-  S.ocupado = true; S.nuevaCarta = got[0].id;
-  S.mensaje = { texto: `Robaste: ${nombreCarta(got[0])}. Pasa el turno…` };
-  render();
-  reloj = setTimeout(() => { S.turno = sig(1); iniciarTurno(); }, 1300);
+  G.mensaje = { texto: `${j.nombre} robó una carta y pasó.` };
+  G.turno = sig(1);
+  G.mov++;
+  cambio();
+}
+function terminarRonda(gi) {
+  const g = G.jugadores[gi];
+  anotar(`${g.nombre}: "¡Presupuesto cerrado!"`);
+  G.resultados = G.jugadores.map(j => {
+    const p = j.hand.reduce((a, c) => a + puntos(c), 0);
+    j.total += p;
+    return { nombre: j.nombre, puntos: p, total: j.total };
+  }).sort((a, b) => a.puntos - b.puntos);
+  G.ganador = g.nombre;
+  G.fase = "fin";
+  G.mensaje = { texto: `¡${g.nombre} cerró su presupuesto!` };
+  cambio();
 }
 
-/* ================= Computadora ================= */
+/* Jugador automático (también juega por quien se desconecta). */
 function turnoBot() {
-  const j = actual();
-  if (acusacionValida() && Math.random() < 0.6) acusar();
-  const ops = j.hand.map((c, i) => i).filter(i => puedeJugar(j.hand[i]));
-  if (!ops.length) { robarYPasar(); return; }
+  if (!G || G.fase !== "juego") return;
+  const pi = G.turno, j = actual();
+  if (acusacionValida() && Math.random() < 0.6) acusar(pi);
+  const t = topeG();
+  const ops = j.hand.map((c, i) => i).filter(i => combina(j.hand[i], t, G.color));
+  if (!ops.length) { robarYPasar(pi); return; }
   const hayAzul = ops.some(i => j.hand[i].color === "b");
   const cand = ops.filter(i => !(hayAzul && j.hand[i].color === "r"));
-  const amenaza = S.jugadores[sig(1)].hand.length <= 2;
+  const amenaza = G.jugadores[sig(1)].hand.length <= 2;
   const valor = c => {
     if (c.tipo === "num") return c.valor + (c.color === "b" ? 6 : 0) + (c.color === "r" ? c.valor : 0) + (c.color === "g" && !j.escudo ? 4 : 0);
     if (c.tipo === "imp" || c.tipo === "cong") return amenaza ? 50 : 12;
     if (c.tipo === "camb") return 9;
     if (c.tipo === "deuda") return amenaza ? 60 : 1;
-    return 0.5; // sueldo extra: se guarda para el final
+    return 0.5;
   };
   let mejor = cand[0];
   for (const i of cand) if (valor(j.hand[i]) > valor(j.hand[mejor])) mejor = i;
@@ -477,59 +546,747 @@ function turnoBot() {
   if (j.hand[mejor].color === "k") {
     const cuenta = { g: 0, b: 0, r: 0, y: 0 };
     j.hand.forEach((c, i) => { if (i !== mejor && c.color !== "k") cuenta[c.color]++; });
-    elegido = Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a])[0];
+    elegido = CODIGOS_COLOR.slice().sort((a, b) => cuenta[b] - cuenta[a])[0];
     if (!cuenta[elegido]) elegido = "b";
   }
   if (j.hand.length === 2 && Math.random() < 0.85) j.dijo = true;
-  jugar(S.turno, mejor, elegido);
+  jugar(pi, mejor, elegido);
+}
+function programar() {
+  clearTimeout(relojMotor);
+  if (!G || G.fase !== "juego") return;
+  const j = actual();
+  if (j.bot) {
+    relojMotor = setTimeout(turnoBot, 1100);
+  } else if (U.modo === "host" && !j.conectado) {
+    const mov = G.mov;
+    relojMotor = setTimeout(() => {
+      if (G && G.fase === "juego" && G.mov === mov && actual() === j && !j.conectado) {
+        anotar(`${j.nombre} está desconectado: la compu juega su turno.`);
+        turnoBot();
+      }
+    }, 10000);
+  }
+}
+/* Después de cada cambio: programa el siguiente turno, avisa a la red y redibuja. */
+function cambio() {
+  programar();
+  if (U.modo === "host") {
+    U.seat = G.jugadores.findIndex(j => j.token === U.token);
+    difundir();
+    guardarAnfitrion();
+  }
+  pintar();
+}
+/* Lo que ve un jugador: la mesa y SOLO su propia mano. */
+function vista(seat) {
+  const yo = seat != null && seat >= 0 ? G.jugadores[seat] : null;
+  return {
+    fase: G.fase, ronda: G.ronda, seat: yo ? seat : null, turno: G.turno, sentido: G.sentido, color: G.color,
+    tope: topeG() || null, mazoN: G.mazo.length,
+    jugadores: G.jugadores.map(j => ({ nombre: j.nombre, n: j.hand.length, bot: j.bot, escudo: j.escudo, conectado: j.bot || j.conectado !== false })),
+    mensaje: G.mensaje, bitacora: G.bitacora.slice(0, 6), acusable: acusacionValida() ? G.acusable : null,
+    mano: yo ? yo.hand : [], dijo: yo ? yo.dijo : false, nueva: yo ? yo.nueva : null,
+    resultados: G.resultados, ganador: G.ganador, mov: G.mov
+  };
 }
 
-/* ================= Acciones de la persona ================= */
-function tocarCarta(idx, el) {
-  if (S.ocupado || !S.visible || actual().bot) return;
-  const j = actual(), c = j.hand[idx];
-  if (!puedeJugar(c)) {
-    el.classList.remove("sacude"); void el.offsetWidth; el.classList.add("sacude");
-    const t = tope();
-    S.mensaje = { texto: `Esa carta no combina. Necesitas color ${COLORES[S.color].nombre}${t.tipo === "num" ? ` o el número ${t.valor}` : ` u otra carta "${ESPECIALES[t.tipo].nombre}"`}, o un comodín.`, alerta: true };
-    renderMensaje();
+/* =================================================================
+   RED — PeerJS (conexión directa entre celulares)
+   ================================================================= */
+const Red = { peer: null, conns: new Map(), conn: null, ultimo: 0, intento: 0, vigia: null, ping: null };
+const idSala = c => "centimo-sala-" + c.toLowerCase();
+function opcionesPeer() {
+  const q = new URLSearchParams(location.search);
+  const h = q.get("peerhost"); // solo para pruebas con un servidor propio
+  return h ? { host: h, port: +(q.get("peerport") || 9000), path: "/", secure: false, debug: 0 } : { debug: 0 };
+}
+function enlaceSala() { return location.origin + location.pathname + "?sala=" + U.codigo; }
+
+/* ----- Anfitrión ----- */
+function crearSala(nombre) {
+  U.modo = "host"; U.pantalla = "partida"; U.retomando = false;
+  U.codigo = azar(4); U.token = azar(12);
+  G = crearEstado([nuevoJugador(nombre, false, U.token)]);
+  U.seat = 0; U.red = "Abriendo la sala…";
+  abrirAnfitrion(0);
+  pintar();
+}
+function retomarSala(g) {
+  U.modo = "host"; U.pantalla = "partida"; U.retomando = true;
+  U.codigo = g.codigo; U.token = g.token; G = g.G;
+  G.jugadores.forEach(j => { if (!j.bot && j.token !== U.token) j.conectado = false; });
+  U.seat = G.jugadores.findIndex(j => j.token === U.token);
+  U.red = "Reabriendo la sala…";
+  abrirAnfitrion(0);
+  pintar();
+}
+function abrirAnfitrion(intento) {
+  const p = new Peer(idSala(U.codigo), opcionesPeer());
+  Red.peer = p;
+  p.on("open", () => {
+    U.red = "ok"; U.retomando = false;
+    guardarAnfitrion(); iniciarPing(); pantallaEncendida();
+    cambio();
+  });
+  p.on("connection", conn => {
+    conn.on("data", d => alRecibirAnfitrion(conn, d));
+    conn.on("close", () => cerroConexion(conn));
+    conn.on("error", () => cerroConexion(conn));
+  });
+  p.on("disconnected", () => { if (!p.destroyed) setTimeout(() => { try { p.reconnect(); } catch (e) { /* nada */ } }, 1500); });
+  p.on("error", e => {
+    if (e.type === "unavailable-id") {
+      p.destroy();
+      if (U.retomando && intento < 10) { setTimeout(() => abrirAnfitrion(intento + 1), 3000); return; }
+      if (G.fase === "sala" && G.jugadores.length === 1) { U.codigo = azar(4); abrirAnfitrion(0); return; }
+      U.red = "No se pudo reabrir la sala. Crea una nueva."; pintar(); return;
+    }
+    if (["network", "server-error", "socket-error", "socket-closed", "disconnected"].includes(e.type)) {
+      U.red = "Sin conexión a internet. Reintentando…"; pintar();
+      if (!p.open && !p.destroyed && intento < 20) setTimeout(() => { p.destroy(); abrirAnfitrion(intento + 1); }, 4000);
+    }
+  });
+}
+function alRecibirAnfitrion(conn, d) {
+  if (!d || typeof d !== "object" || !G) return;
+  if (d.t === "hola") {
+    const token = String(d.token || "").slice(0, 32);
+    if (!token) return;
+    let i = G.jugadores.findIndex(j => j.token === token);
+    if (i < 0) {
+      if (G.fase !== "sala") { rechazar(conn, "La partida ya empezó. Pide al anfitrión que vuelva a la sala para que puedas entrar."); return; }
+      if (G.jugadores.length >= 10) { rechazar(conn, "La sala está llena (máximo 10 jugadores)."); return; }
+      let nombre = limpiarNombre(d.nombre) || `Jugador ${G.jugadores.length + 1}`;
+      const usados = new Set(G.jugadores.map(j => j.nombre.toLowerCase()));
+      let base = nombre, k = 2;
+      while (usados.has(nombre.toLowerCase())) nombre = `${base.slice(0, 13)} ${k++}`;
+      G.jugadores.push(nuevoJugador(nombre, false, token));
+    } else {
+      G.jugadores[i].conectado = true;
+    }
+    for (const [k, v] of Red.conns) if (v.token === token && v.conn !== conn) { try { v.conn.close(); } catch (e) { /* nada */ } Red.conns.delete(k); }
+    Red.conns.set(conn.peer, { conn, token, ultimo: Date.now() });
+    cambio();
     return;
   }
-  const seguir = () => c.color === "k" ? elegirColor(col => jugar(S.turno, idx, col)) : jugar(S.turno, idx);
-  if (c.color === "r" && tieneNecesidadJugable(j, idx)) {
+  const info = Red.conns.get(conn.peer);
+  if (!info || info.conn !== conn) return;
+  info.ultimo = Date.now();
+  if (d.t === "pong") return;
+  const seat = G.jugadores.findIndex(j => j.token === info.token);
+  if (seat < 0) return;
+  if (d.t === "adios") { Red.conns.delete(conn.peer); quitarJugadorRed(info.token); return; }
+  if (["jugar", "robar", "ultimo", "acusar"].includes(d.t)) {
+    const err = accion(seat, { t: d.t, idx: d.idx, color: d.color });
+    if (err) { try { conn.send({ t: "error", texto: err }); } catch (e) { /* nada */ } }
+  }
+}
+function rechazar(conn, texto) {
+  try { conn.send({ t: "rechazo", texto }); } catch (e) { /* nada */ }
+  setTimeout(() => { try { conn.close(); } catch (e) { /* nada */ } }, 800);
+}
+function cerroConexion(conn) {
+  const info = Red.conns.get(conn.peer);
+  if (!info || info.conn !== conn) return;
+  Red.conns.delete(conn.peer);
+  quitarJugadorRed(info.token);
+}
+function quitarJugadorRed(token) {
+  if (!G) return;
+  const i = G.jugadores.findIndex(j => j.token === token);
+  if (i < 0) return;
+  if (G.fase === "sala") G.jugadores.splice(i, 1);
+  else G.jugadores[i].conectado = false;
+  cambio();
+}
+function difundir() {
+  for (const info of Red.conns.values()) {
+    const seat = G.jugadores.findIndex(j => j.token === info.token);
+    if (seat >= 0 && info.conn.open) {
+      try { info.conn.send({ t: "estado", v: vista(seat) }); } catch (e) { /* se reintenta con el próximo cambio */ }
+    }
+  }
+}
+function iniciarPing() {
+  clearInterval(Red.ping);
+  Red.ping = setInterval(() => {
+    const ahora = Date.now();
+    for (const [k, info] of Red.conns) {
+      if (ahora - info.ultimo > 16000) { try { info.conn.close(); } catch (e) { /* nada */ } if (Red.conns.get(k) === info) { Red.conns.delete(k); quitarJugadorRed(info.token); } }
+      else { try { info.conn.send({ t: "ping" }); } catch (e) { /* nada */ } }
+    }
+  }, 4000);
+}
+function guardarAnfitrion() {
+  if (U.modo === "host" && G) guardar("centimo-anfitrion", { codigo: U.codigo, token: U.token, G, t: Date.now() });
+}
+function cerrarSala() {
+  for (const info of Red.conns.values()) { try { info.conn.send({ t: "cerrada" }); } catch (e) { /* nada */ } }
+  guardar("centimo-anfitrion", null);
+  setTimeout(salirRed, 300);
+  clearTimeout(relojMotor);
+  G = null; U.modo = null; U.pantalla = "inicio";
+  pintar();
+}
+
+/* ----- Invitado ----- */
+function unirseSala(codigo, nombre) {
+  U.modo = "guest"; U.pantalla = "partida"; U.codigo = codigo; U.nombre = nombre; U.V = null;
+  const prev = leer("centimo-invitado");
+  U.token = (prev && prev.codigo === codigo && prev.token) || azar(12);
+  guardar("centimo-invitado", { codigo, token: U.token, nombre, t: Date.now() });
+  U.red = "Conectando…";
+  const p = new Peer(opcionesPeer());
+  Red.peer = p;
+  p.on("open", conectarAnfitrion);
+  p.on("disconnected", () => { if (!p.destroyed) setTimeout(() => { try { p.reconnect(); } catch (e) { /* nada */ } }, 1500); });
+  p.on("error", e => {
+    if (e.type === "peer-unavailable") {
+      if (!U.V) {
+        salirRed(); guardar("centimo-invitado", null);
+        U.modo = null; U.pantalla = "unirse";
+        U.error = `No encontramos la sala ${codigo}. Revisa el código, o pide al anfitrión que tenga Céntimo abierto.`;
+        pintar();
+      } else { U.red = "El anfitrión se desconectó. Esperando que vuelva…"; pintar(); }
+      return;
+    }
+    if (["network", "server-error", "socket-error", "socket-closed", "disconnected"].includes(e.type)) {
+      U.red = "Sin conexión a internet. Reintentando…"; pintar();
+    }
+  });
+  clearInterval(Red.vigia);
+  Red.vigia = setInterval(() => {
+    const p2 = Red.peer;
+    if (!p2 || p2.destroyed || !p2.open) return;
+    const ahora = Date.now();
+    const abierta = Red.conn && Red.conn.open;
+    if ((!abierta && ahora - Red.intento > 5000) || (abierta && ahora - Red.ultimo > 15000)) {
+      U.red = "Reconectando…"; pintar();
+      conectarAnfitrion();
+    }
+  }, 2500);
+  pantallaEncendida();
+  pintar();
+}
+function conectarAnfitrion() {
+  if (Red.conn) { try { Red.conn.close(); } catch (e) { /* nada */ } }
+  const c = Red.peer.connect(idSala(U.codigo), { reliable: true });
+  Red.conn = c; Red.intento = Date.now(); Red.ultimo = Date.now();
+  c.on("open", () => { try { c.send({ t: "hola", nombre: U.nombre, token: U.token }); } catch (e) { /* nada */ } });
+  c.on("data", d => { if (c !== Red.conn) return; Red.ultimo = Date.now(); alRecibirInvitado(d); });
+  c.on("close", () => { if (c === Red.conn && U.modo === "guest") { U.red = "Se perdió la conexión. Reconectando…"; pintar(); } });
+}
+function alRecibirInvitado(d) {
+  if (!d || typeof d !== "object") return;
+  if (d.t === "ping") { try { Red.conn.send({ t: "pong" }); } catch (e) { /* nada */ } if (U.red !== "ok") { U.red = "ok"; pintar(); } return; }
+  if (d.t === "estado" && d.v && typeof d.v === "object") {
+    U.V = d.v; U.seat = d.v.seat; U.red = "ok";
+    guardar("centimo-invitado", { codigo: U.codigo, token: U.token, nombre: U.nombre, t: Date.now() });
+    pintar();
+    return;
+  }
+  if (d.t === "error") { avisar(String(d.texto || "No se pudo hacer esa jugada."), true); return; }
+  if (d.t === "rechazo" || d.t === "cerrada") {
+    salirRed(); guardar("centimo-invitado", null);
+    U.modo = null; U.pantalla = "inicio"; U.V = null;
+    pintar();
+    modal(`<h2>${d.t === "cerrada" ? "El anfitrión cerró la sala" : "No pudiste entrar"}</h2><p>${esc(d.t === "cerrada" ? "La partida terminó. ¡Gracias por jugar!" : String(d.texto || ""))}</p>`,
+      [{ txt: "Entendido", cls: "primario", fn: cerrarCapa }]);
+  }
+}
+function enviarRed(msg) {
+  if (!Red.conn || !Red.conn.open) { avisar("Sin conexión con el anfitrión. Reintentando…", true); return; }
+  try { Red.conn.send(msg); } catch (e) { avisar("No se pudo enviar. Intenta de nuevo.", true); }
+}
+function salirRed() {
+  clearInterval(Red.vigia); clearInterval(Red.ping);
+  try { if (Red.conn) Red.conn.close(); } catch (e) { /* nada */ }
+  try { if (Red.peer) Red.peer.destroy(); } catch (e) { /* nada */ }
+  Red.peer = null; Red.conn = null; Red.conns = new Map();
+  soltarPantalla();
+}
+
+/* Mantener la pantalla encendida mientras juegan. */
+let bloqueo = null;
+async function pantallaEncendida() {
+  try { if ("wakeLock" in navigator && document.visibilityState === "visible") bloqueo = await navigator.wakeLock.request("screen"); } catch (e) { /* opcional */ }
+}
+function soltarPantalla() { try { if (bloqueo) bloqueo.release(); } catch (e) { /* nada */ } bloqueo = null; }
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  if (U.modo === "host" || U.modo === "guest") pantallaEncendida();
+  if (U.modo === "guest" && Red.peer && !Red.peer.destroyed) {
+    if (Red.peer.disconnected) { try { Red.peer.reconnect(); } catch (e) { /* nada */ } }
+    else if (!Red.conn || !Red.conn.open) conectarAnfitrion();
+  }
+});
+
+/* =================================================================
+   PANTALLAS
+   ================================================================= */
+const $app = document.getElementById("app");
+const $capa = document.getElementById("capa");
+const qs = new URLSearchParams(location.search);
+const U = {
+  pantalla: "inicio", modo: null, V: null, seat: null, token: null, codigo: null, nombre: "",
+  red: "", error: "", aviso: null, avisoMov: -1, movVisto: -1, cortinaMov: -1, finVisto: -1, capaTipo: null,
+  retomando: false, config: cargarConfig()
+};
+if (qs.get("sala")) { U.pantalla = "unirse"; U.codigoPre = qs.get("sala").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4); }
+
+function cargarConfig() {
+  const g = leer("centimo-config");
+  if (Array.isArray(g) && g.length >= 2) return g.slice(0, 10).map(c => ({ nombre: limpiarNombre(c.nombre), bot: !!c.bot }));
+  return [1, 2, 3, 4].map(i => ({ nombre: `Jugador ${i}`, bot: false }));
+}
+function avisar(texto, alerta) {
+  U.aviso = { texto, alerta }; U.avisoMov = vistaActual() ? vistaActual().mov : -1;
+  const el = document.getElementById("mensaje");
+  if (el) { el.className = "mensaje" + (alerta ? " alerta" : ""); el.textContent = texto; }
+}
+function vistaActual() {
+  if (U.modo === "guest") return U.V;
+  if (G && U.modo === "host") return vista(U.seat);
+  return null;
+}
+
+function pintar() {
+  if (U.pantalla === "inicio") return pantallaInicio();
+  if (U.pantalla === "local") return pantallaLocal();
+  if (U.pantalla === "crear") return pantallaCrear();
+  if (U.pantalla === "unirse") return pantallaUnirse();
+
+  let V, puede = false;
+  if (U.modo === "local") {
+    const hum = G.jugadores.filter(j => !j.bot).length;
+    const j = actual();
+    let seat = null;
+    if (G.fase === "juego" && !j.bot && hum > 1) {
+      if (U.movVisto === G.mov) seat = G.turno;
+      else if (U.cortinaMov !== G.mov) { U.cortinaMov = G.mov; mostrarCortina(j); }
+    } else if (G.fase === "juego" && !j.bot) seat = G.turno;
+    else if (hum === 1) seat = G.jugadores.findIndex(x => !x.bot);
+    V = vista(seat);
+  } else if (U.modo === "host") {
+    V = G ? vista(U.seat) : null;
+  } else {
+    V = U.V;
+  }
+  if (!V) return pantallaConectando();
+  if (V.fase === "sala") { if (U.capaTipo === "fin") cerrarCapa(); return pantallaSala(V); }
+  puede = V.fase === "juego" && V.seat !== null && V.turno === V.seat;
+  if (!puede && U.capaTipo === "jugada") cerrarCapa();
+  if (V.fase === "juego" && U.capaTipo === "fin") cerrarCapa();
+  pantallaJuego(V, puede);
+  const claveFin = (U.codigo || "") + "-" + V.mov;
+  if (V.fase === "fin" && U.finVisto !== claveFin) { U.finVisto = claveFin; mostrarResultados(V); }
+}
+
+function chipRed() {
+  if (U.modo !== "host" && U.modo !== "guest") return "";
+  return U.red && U.red !== "ok" ? `<div class="red-aviso" role="status">${esc(U.red)}</div>` : "";
+}
+function logo(sub) {
+  return `<div class="logo"><div class="moneda" aria-hidden="true">¢</div>
+    <div><h1>Céntimo</h1>${sub ? `<p>${sub}</p>` : ""}</div></div>`;
+}
+
+/* ----- Inicio ----- */
+function pantallaInicio() {
+  const host = leer("centimo-anfitrion"), inv = leer("centimo-invitado");
+  const reciente = x => x && x.t && Date.now() - x.t < 3 * 3600 * 1000;
+  const online = enLineaPosible();
+  $app.innerHTML = `<div class="portada">
+    ${logo("El juego de cartas de tu presupuesto del mes. Paga primero lo necesario, ahorra para los imprevistos y cierra tu mes antes que los demás.")}
+    <div class="muestra" aria-hidden="true">
+      ${htmlCarta({ color: "b", tipo: "num", valor: 9 })}${htmlCarta({ color: "r", tipo: "num", valor: 5 })}
+      ${htmlCarta({ color: "g", tipo: "num", valor: 5 })}${htmlCarta({ color: "y", tipo: "num", valor: 4 })}
+      ${htmlCarta({ color: "k", tipo: "deuda" })}
+    </div>
+    ${online && (reciente(host) || reciente(inv)) ? `<div class="retomar">
+      ${reciente(host) ? `<button class="btn primario" id="ret-host">Volver a tu sala ${esc(host.codigo)}</button>` : ""}
+      ${reciente(inv) ? `<button class="btn primario" id="ret-inv">Volver a la sala ${esc(inv.codigo)}</button>` : ""}
+    </div>` : ""}
+    <div class="opciones">
+      ${online ? `
+      <button class="opcion destacada" id="op-crear"><b>Crear sala</b><span>Cada jugador juega en su propio celular. Tú compartes un código o un QR.</span></button>
+      <button class="opcion" id="op-unirse"><b>Unirme a una sala</b><span>Escribe el código de 4 letras que te dio quien creó la sala.</span></button>` : ""}
+      <button class="opcion ${online ? "" : "destacada"}" id="op-local"><b>Un solo dispositivo</b><span>Se pasan el mismo celular por turnos, o juegas contra la compu.</span></button>
+    </div>
+    ${!online ? `<p class="nota">Para que cada jugador use su propio celular, abre Céntimo desde <a href="${URL_PUBLICA}" target="_blank" rel="noopener">${URL_PUBLICA}</a>.</p>` : ""}
+    <div class="acciones-inicio">
+      <button class="btn" id="reglas">Cómo se juega</button>
+      ${puedeInstalar() ? `<button class="btn" id="instalar">Instalar app</button>` : ""}
+    </div>
+  </div>`;
+  const on = (id, fn) => { const el = $app.querySelector(id); if (el) el.onclick = fn; };
+  on("#op-crear", () => { U.pantalla = "crear"; U.error = ""; pintar(); });
+  on("#op-unirse", () => { U.pantalla = "unirse"; U.error = ""; pintar(); });
+  on("#op-local", () => { U.pantalla = "local"; pintar(); });
+  on("#ret-host", () => retomarSala(host));
+  on("#ret-inv", () => unirseSala(inv.codigo, inv.nombre));
+  on("#reglas", mostrarReglas);
+  on("#instalar", instalarApp);
+}
+
+/* ----- Crear sala ----- */
+function pantallaCrear() {
+  const nombre = leer("centimo-nombre") || "";
+  $app.innerHTML = `<div class="portada">
+    ${logo("")}
+    <form class="panel" id="f-crear" novalidate>
+      <h2>Crear sala</h2>
+      <p class="nota">Tu celular será el anfitrión: mantén Céntimo abierto mientras juegan.</p>
+      <div class="campo"><label for="c-nombre">Tu nombre</label>
+        <input id="c-nombre" maxlength="16" autocomplete="nickname" value="${esc(nombre)}" placeholder="Ej: Sofía"></div>
+      ${U.error ? `<p class="error">${esc(U.error)}</p>` : ""}
+      <div class="acciones-inicio">
+        <button class="btn primario" type="submit">Crear sala</button>
+        <button class="btn" type="button" id="volver">Volver</button>
+      </div>
+    </form>
+  </div>`;
+  $app.querySelector("#volver").onclick = () => { U.pantalla = "inicio"; pintar(); };
+  $app.querySelector("#f-crear").onsubmit = e => {
+    e.preventDefault();
+    const n = limpiarNombre($app.querySelector("#c-nombre").value);
+    if (!n) { U.error = "Escribe tu nombre para que los demás te reconozcan."; pintar(); return; }
+    guardar("centimo-nombre", n); U.error = "";
+    crearSala(n);
+  };
+  const inp = $app.querySelector("#c-nombre"); if (!nombre) inp.focus();
+}
+
+/* ----- Unirse ----- */
+function pantallaUnirse() {
+  const nombre = leer("centimo-nombre") || "";
+  const codigo = U.codigoPre || "";
+  $app.innerHTML = `<div class="portada">
+    ${logo("")}
+    <form class="panel" id="f-unirse" novalidate>
+      <h2>Unirme a una sala</h2>
+      <div class="campo"><label for="u-codigo">Código de la sala</label>
+        <input id="u-codigo" class="codigo-in" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(codigo)}" placeholder="ABCD"></div>
+      <div class="campo"><label for="u-nombre">Tu nombre</label>
+        <input id="u-nombre" maxlength="16" autocomplete="nickname" value="${esc(nombre)}" placeholder="Ej: Florencia"></div>
+      ${U.error ? `<p class="error">${esc(U.error)}</p>` : ""}
+      <div class="acciones-inicio">
+        <button class="btn primario" type="submit">Entrar a la sala</button>
+        <button class="btn" type="button" id="volver">Volver</button>
+      </div>
+    </form>
+  </div>`;
+  $app.querySelector("#volver").onclick = () => { U.pantalla = "inicio"; U.codigoPre = ""; pintar(); };
+  $app.querySelector("#f-unirse").onsubmit = e => {
+    e.preventDefault();
+    const c = $app.querySelector("#u-codigo").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const n = limpiarNombre($app.querySelector("#u-nombre").value);
+    U.codigoPre = c;
+    if (c.length !== 4) { U.error = "El código tiene 4 letras o números."; pintar(); return; }
+    if (!n) { U.error = "Escribe tu nombre para que los demás te reconozcan."; pintar(); return; }
+    guardar("centimo-nombre", n); U.error = "";
+    unirseSala(c, n);
+  };
+  const foco = codigo.length === 4 ? "#u-nombre" : "#u-codigo";
+  if (codigo.length !== 4 || !nombre) $app.querySelector(foco).focus();
+}
+
+/* ----- Un solo dispositivo ----- */
+function pantallaLocal() {
+  const n = U.config.length;
+  $app.innerHTML = `<div class="portada">
+    ${logo("")}
+    <section class="panel" aria-labelledby="t-jug">
+      <h2 id="t-jug">Un solo dispositivo: ¿cuántos juegan?</h2>
+      <div class="contador">
+        <button class="btn redondo" id="menos" aria-label="Quitar jugador" ${n <= 2 ? "disabled" : ""}>−</button>
+        <span class="n" aria-live="polite">${n}</span>
+        <button class="btn redondo" id="mas" aria-label="Agregar jugador" ${n >= 10 ? "disabled" : ""}>+</button>
+        <span class="nota">de 2 a 10 jugadores</span>
+      </div>
+      <div class="lista-jug">${U.config.map((c, i) => `
+        <div class="fila-jug">
+          <input id="nombre-${i}" data-i="${i}" value="${esc(c.nombre)}" maxlength="16" aria-label="Nombre del jugador ${i + 1}">
+          <div class="seg" role="group" aria-label="Quién juega">
+            <button data-tipo="${i}" data-bot="0" aria-pressed="${!c.bot}">Persona</button>
+            <button data-tipo="${i}" data-bot="1" aria-pressed="${c.bot}">Compu</button>
+          </div>
+        </div>`).join("")}
+      </div>
+      <p class="nota">Las personas se pasan el mismo celular o computador por turnos. "Compu" es un jugador automático. ${n > 5 ? "Con 6 o más jugadores se usan dos mazos (112 cartas)." : ""}</p>
+      <div class="acciones-inicio">
+        <button class="btn primario" id="empezar">Empezar partida</button>
+        <button class="btn" id="volver">Volver</button>
+      </div>
+    </section>
+  </div>`;
+  const g = () => guardar("centimo-config", U.config);
+  $app.querySelector("#menos").onclick = () => { U.config.pop(); g(); pintar(); };
+  $app.querySelector("#mas").onclick = () => { U.config.push({ nombre: `Jugador ${U.config.length + 1}`, bot: false }); g(); pintar(); };
+  $app.querySelectorAll("input[data-i]").forEach(inp => inp.oninput = () => { U.config[+inp.dataset.i].nombre = inp.value; g(); });
+  $app.querySelectorAll("[data-tipo]").forEach(b => b.onclick = () => { U.config[+b.dataset.tipo].bot = b.dataset.bot === "1"; g(); pintar(); });
+  $app.querySelector("#volver").onclick = () => { U.pantalla = "inicio"; pintar(); };
+  $app.querySelector("#empezar").onclick = () => {
+    U.modo = "local"; U.pantalla = "partida"; U.movVisto = -1; U.cortinaMov = -1; U.finVisto = -1;
+    G = crearEstado(U.config.map((c, i) => nuevoJugador(limpiarNombre(c.nombre) || `Jugador ${i + 1}`, c.bot)));
+    empezarRonda();
+  };
+}
+
+/* ----- Conectando (invitado, antes del primer estado) ----- */
+function pantallaConectando() {
+  $app.innerHTML = `<div class="portada">
+    ${logo("")}
+    <section class="panel">
+      <h2>Entrando a la sala ${esc(U.codigo || "")}</h2>
+      <p class="esperando">${esc(U.red && U.red !== "ok" ? U.red : "Conectando…")}</p>
+      <div class="acciones-inicio"><button class="btn" id="cancelar">Cancelar</button></div>
+    </section>
+  </div>`;
+  $app.querySelector("#cancelar").onclick = () => {
+    salirRed(); guardar(U.modo === "host" ? "centimo-anfitrion" : "centimo-invitado", null);
+    G = null; U.modo = null; U.pantalla = "inicio"; pintar();
+  };
+}
+
+/* ----- Sala de espera ----- */
+function pantallaSala(V) {
+  const soyHost = U.modo === "host";
+  const link = enlaceSala();
+  let qr = "";
+  if (soyHost && typeof window.qrcode === "function") {
+    try { const q = qrcode(0, "M"); q.addData(link); q.make(); qr = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); } catch (e) { qr = ""; }
+  }
+  const listo = U.red === "ok";
+  $app.innerHTML = `<div class="juego">
+    <div class="barra">
+      <div class="marca"><span class="moneda" aria-hidden="true">¢</span>Céntimo <span class="ronda">Sala de espera</span></div>
+      <div class="der"><button class="btn chico" id="b-reglas">Reglas</button><button class="btn chico" id="b-salir">${soyHost ? "Cerrar sala" : "Salir"}</button></div>
+    </div>
+    ${chipRed()}
+    <section class="panel">
+      <div class="sala-cab">
+        <div style="display:grid;gap:8px;min-width:0">
+          <span class="nota">${soyHost ? "Pide a cada jugador que abra Céntimo, toque <b>Unirme a una sala</b> y escriba este código:" : "Estás en la sala"}</span>
+          <div class="codigo" aria-label="Código de la sala">${esc(U.codigo)}</div>
+          ${soyHost ? `<span class="nota">o que escaneen el QR con la cámara del celular.</span>` : ""}
+        </div>
+        ${qr && listo ? `<div class="qr" aria-label="Código QR para entrar a la sala">${qr}</div>` : ""}
+      </div>
+      ${soyHost && listo ? `<div class="enlace"><code id="link">${esc(link)}</code>
+        <button class="btn chico" id="b-copiar">Copiar link</button>
+        ${navigator.share ? `<button class="btn chico" id="b-compartir">Compartir</button>` : ""}</div>` : ""}
+    </section>
+    <section class="panel">
+      <h2>Jugadores (${V.jugadores.length} de 10)</h2>
+      <ul class="lista-sala">${V.jugadores.map((j, i) => `
+        <li><span class="punto ${j.conectado ? "" : "off"}" aria-hidden="true"></span>
+          <span class="nombre">${esc(j.nombre)}</span>
+          ${i === 0 && !j.bot ? `<span class="badge anfitrion">Anfitrión</span>` : ""}
+          ${j.bot ? `<span class="badge bot">Compu</span>` : ""}
+          ${i === V.seat ? `<span class="badge tu">Tú</span>` : ""}
+          ${soyHost && i !== V.seat && (j.bot || !j.conectado) ? `<button class="btn chico" data-quitar="${i}">Quitar</button>` : ""}
+        </li>`).join("")}
+      </ul>
+      ${soyHost ? `
+        <p class="nota">Pueden entrar de 2 a 10 jugadores. Si son pocos, agrega jugadores de la compu. ${V.jugadores.length > 5 ? "Con 6 o más se usan dos mazos (112 cartas)." : ""}</p>
+        <div class="acciones-inicio">
+          <button class="btn primario" id="b-empezar" ${V.jugadores.length < 2 || !listo ? "disabled" : ""}>${V.jugadores.length < 2 ? "Esperando jugadores…" : `Empezar con ${V.jugadores.length} jugadores`}</button>
+          <button class="btn" id="b-bot" ${V.jugadores.length >= 10 ? "disabled" : ""}>Agregar compu</button>
+        </div>`
+      : `<p class="esperando">Esperando que ${esc(V.jugadores[0] ? V.jugadores[0].nombre : "el anfitrión")} empiece la partida…</p>`}
+    </section>
+  </div>`;
+  $app.querySelector("#b-reglas").onclick = mostrarReglas;
+  $app.querySelector("#b-salir").onclick = salirConfirmar;
+  if (!soyHost) return;
+  const bc = $app.querySelector("#b-copiar");
+  if (bc) bc.onclick = () => {
+    const fallo = () => { const r = document.createRange(); r.selectNodeContents($app.querySelector("#link")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); bc.textContent = "Selecciona y copia"; };
+    try { navigator.clipboard.writeText(link).then(() => { bc.textContent = "¡Copiado!"; }, fallo); } catch (e) { fallo(); }
+  };
+  const bs = $app.querySelector("#b-compartir");
+  if (bs) bs.onclick = () => { navigator.share({ title: "Céntimo", text: `Únete a mi sala de Céntimo con el código ${U.codigo}`, url: link }).catch(() => {}); };
+  $app.querySelectorAll("[data-quitar]").forEach(b => b.onclick = () => {
+    const i = +b.dataset.quitar, j = G.jugadores[i];
+    if (!j || i === U.seat) return;
+    for (const [k, v] of Red.conns) if (v.token === j.token) { try { v.conn.close(); } catch (e) { /* nada */ } Red.conns.delete(k); }
+    G.jugadores.splice(i, 1); cambio();
+  });
+  $app.querySelector("#b-bot").onclick = () => {
+    if (G.jugadores.length >= 10) return;
+    let k = 1; while (G.jugadores.some(j => j.nombre === `Compu ${k}`)) k++;
+    G.jugadores.push(nuevoJugador(`Compu ${k}`, true)); cambio();
+  };
+  $app.querySelector("#b-empezar").onclick = () => {
+    if (G.jugadores.length < 2) return;
+    G.ronda = 0; G.jugadores.forEach(j => { j.total = 0; });
+    empezarRonda();
+  };
+}
+
+/* ----- Mesa de juego ----- */
+function htmlCarta(c, extra = "", attrs = "") {
+  if (c.tipo === "num") {
+    return `<button class="carta c-${c.color} ${extra}" ${attrs} aria-label="${esc(CAT_SINGULAR[c.color] + ": " + nombreCarta(c))}"><span class="inner">
+      <span class="cat">${CAT_SINGULAR[c.color]}</span><span class="big">${c.valor}</span>
+      <span><span class="nm">${GASTOS[c.color][c.valor - 1]}</span><br><span class="amt">$${c.valor} mil</span></span></span></button>`;
+  }
+  const e = ESPECIALES[c.tipo];
+  return `<button class="carta c-${c.color} ${extra}" ${attrs} aria-label="${esc(e.nombre + ". " + e.corto)}"><span class="inner">
+    <span class="cat">${CAT_SINGULAR[c.color]}</span><span class="big">${e.simbolo}</span>
+    <span><span class="nm">${e.nombre}</span><br><span class="amt">${e.corto}</span></span></span></button>`;
+}
+
+function pantallaJuego(V, puede) {
+  const t = V.tope;
+  const yo = V.seat !== null ? V.jugadores[V.seat] : null;
+  const turnoNom = V.jugadores[V.turno] ? V.jugadores[V.turno].nombre : "";
+  const aviso = U.aviso && U.avisoMov === V.mov ? U.aviso : null;
+  let msg = aviso ? aviso.texto : (V.mensaje ? V.mensaje.texto : "");
+  if (!aviso && V.fase === "juego") msg += puede ? " Te toca." : ` Ahora juega ${turnoNom}.`;
+  const alerta = aviso ? aviso.alerta : !!(V.mensaje && V.mensaje.alerta);
+  const necAviso = puede && V.mano.some(c => c.color === "b" && combina(c, t, V.color)) && V.mano.some(c => c.color === "r" && combina(c, t, V.color));
+  const enRed = U.modo === "host" || U.modo === "guest";
+
+  $app.innerHTML = `<div class="juego">
+    <div class="barra">
+      <div class="marca"><span class="moneda" aria-hidden="true">¢</span>Céntimo <span class="ronda">Ronda ${V.ronda}${enRed ? ` · Sala ${esc(U.codigo)}` : ""}</span></div>
+      <div class="der"><button class="btn chico" id="b-reglas">Reglas</button><button class="btn chico" id="b-salir">Salir</button></div>
+    </div>
+    ${chipRed()}
+
+    <div class="jugadores" aria-label="Jugadores">${V.jugadores.map((p, i) => `
+      <div class="chip ${i === V.turno ? "activo" : ""}">
+        <span class="nombre">${esc(p.nombre)}</span>
+        <span class="info"><i class="mini"></i>${p.n} ${p.n === 1 ? "carta" : "cartas"}</span>
+        <span class="info">${i === V.seat && enRed ? `<span class="badge tu">Tú</span>` : ""}${p.bot ? `<span class="badge bot">Compu</span>` : ""}${!p.conectado ? `<span class="badge off">Sin conexión</span>` : ""}${p.escudo ? `<span class="badge escudo">Escudo</span>` : ""}${p.n === 1 ? `<span class="badge ultimo">Último gasto</span>` : ""}</span>
+      </div>`).join("")}
+    </div>
+
+    <div class="centro">
+      <div class="pila">
+        <button class="carta dorso" id="b-mazo" ${puede ? "" : "disabled"} aria-label="Robar una carta y pasar"><span class="inner"><span class="big">¢</span></span></button>
+        <small>Mazo · ${V.mazoN}</small>
+      </div>
+      <div class="descarte">${t ? htmlCarta(t, "grande", 'tabindex="-1" aria-disabled="true"') : ""}<small>Carta en juego</small></div>
+      <div class="estado">
+        <span class="color-actual c-${V.color}"><i></i>Color: ${COLORES[V.color] ? COLORES[V.color].nombre : ""}</span>
+        <span class="sentido">Sentido: ${V.sentido === 1 ? "→ hacia la derecha" : "← hacia la izquierda"}</span>
+      </div>
+    </div>
+
+    <div class="mensaje ${alerta ? "alerta" : ""}" id="mensaje" aria-live="polite">${esc(msg)}</div>
+
+    <section class="zona-mano" aria-label="Tu mano">
+      ${yo ? `
+        <div class="titulo"><h2>${enRed ? "Tus cartas" : `Cartas de ${esc(yo.nombre)}`}${puede ? ` <span class="turno-tuyo">· ¡te toca!</span>` : ""}</h2>
+          ${puede ? `<p class="pista">Juega color <b>${COLORES[V.color].nombre}</b>${t.tipo === "num" ? ` o número <b>${t.valor}</b>` : ""}, o un comodín.</p>` : `<p class="pista">${V.fase === "juego" ? `Espera tu turno. Ahora juega <b>${esc(turnoNom)}</b>.` : "Ronda terminada."}</p>`}
+        </div>
+        ${puede && V.acusable !== null ? `<div class="acusar"><p><b>${esc(V.jugadores[V.acusable].nombre)}</b> quedó con una carta y no dijo "¡Último gasto!".</p><button class="btn peligro chico" id="b-acusar">Acusar: roba 2</button></div>` : ""}
+        ${necAviso ? `<div class="aviso-nec">Necesidades primero: tienes una carta azul que puedes pagar antes que tus Gustos.</div>` : ""}
+        <div class="mano">${V.mano.map((c, i) => {
+          const cls = puede ? (combina(c, t, V.color) ? "jugable" : "nojugable") : "";
+          return htmlCarta(c, cls + (c.id === V.nueva ? " nueva" : ""), `data-c="${i}" ${puede ? "" : 'tabindex="-1"'}`);
+        }).join("")}</div>
+        ${puede ? `<div class="acciones">
+          <button class="btn" id="b-robar">Robar carta y pasar</button>
+          <button class="btn ${V.dijo ? "dicho" : "primario"}" id="b-ultimo" ${V.mano.length === 2 ? "" : "disabled"}>${V.dijo ? "Dijiste: ¡Último gasto!" : "¡Último gasto!"}</button>
+        </div>` : ""}`
+      : `<p class="espera">Las cartas están ocultas hasta que el próximo jugador las destape.</p>`}
+    </section>
+
+    <ul class="bitacora" aria-label="Lo que ha pasado">${V.bitacora.slice(0, 5).map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+  </div>`;
+
+  $app.querySelector("#b-reglas").onclick = mostrarReglas;
+  $app.querySelector("#b-salir").onclick = salirConfirmar;
+  if (!puede) return;
+  $app.querySelectorAll("[data-c]").forEach(el => el.onclick = () => tocarCarta(V, +el.dataset.c, el));
+  $app.querySelector("#b-mazo").onclick = () => enviar({ t: "robar" });
+  $app.querySelector("#b-robar").onclick = () => enviar({ t: "robar" });
+  $app.querySelector("#b-ultimo").onclick = () => enviar({ t: "ultimo" });
+  const ba = $app.querySelector("#b-acusar");
+  if (ba) ba.onclick = () => enviar({ t: "acusar" });
+}
+
+/* Enviar una jugada: en local/anfitrión va directo al motor; el invitado la manda por la red. */
+function enviar(a) {
+  if (U.modo === "guest") { enviarRed(a); return; }
+  const pi = U.modo === "local" ? G.turno : U.seat;
+  const err = accion(pi, a);
+  if (err) avisar(err, true);
+}
+function tocarCarta(V, idx, el) {
+  const c = V.mano[idx];
+  if (!c) return;
+  if (!combina(c, V.tope, V.color)) {
+    el.classList.remove("sacude"); void el.offsetWidth; el.classList.add("sacude");
+    const t = V.tope;
+    avisar(`Esa carta no combina. Necesitas color ${COLORES[V.color].nombre}${t.tipo === "num" ? ` o el número ${t.valor}` : ` u otra carta "${ESPECIALES[t.tipo].nombre}"`}, o un comodín.`, true);
+    return;
+  }
+  const seguir = () => {
+    if (c.color === "k") elegirColor(col => enviar({ t: "jugar", idx, color: col }));
+    else enviar({ t: "jugar", idx });
+  };
+  if (c.color === "r" && hayNecesidad(V.mano, idx, V.tope, V.color)) {
     modal(`<h2>Necesidades primero</h2>
       <p>Tienes una carta <b>azul (Necesidad)</b> que puedes pagar ahora. Si juegas este Gusto, <b>robas 2 cartas de castigo</b>.</p>`,
       [{ txt: "Volver y elegir otra", cls: "primario", fn: cerrarCapa },
-       { txt: "Jugar el Gusto igual (+2)", cls: "peligro", fn: () => { cerrarCapa(); seguir(); } }]);
+       { txt: "Jugar el Gusto igual (+2)", cls: "peligro", fn: () => { cerrarCapa(); seguir(); } }], "", "jugada");
     return;
   }
   seguir();
 }
 function elegirColor(fn) {
   modal(`<h2>¿Qué color sigue?</h2>
-    <div class="elige-color">${Object.keys(COLORES).map(k => `<button class="c-${k}" data-col="${k}">${COLORES[k].nombre}<small>${COLORES[k].corto}</small></button>`).join("")}</div>`,
-    [{ txt: "Cancelar", fn: cerrarCapa }]);
+    <div class="elige-color">${CODIGOS_COLOR.map(k => `<button class="c-${k}" data-col="${k}">${COLORES[k].nombre}<small>${COLORES[k].corto}</small></button>`).join("")}</div>`,
+    [{ txt: "Cancelar", fn: cerrarCapa }], "", "jugada");
   $capa.querySelectorAll("[data-col]").forEach(b => b.onclick = () => { cerrarCapa(); fn(b.dataset.col); });
+}
+function salirConfirmar() {
+  const textos = {
+    host: ["¿Cerrar la sala?", "La partida termina para todos los jugadores."],
+    guest: ["¿Salir de la sala?", "Si la partida está en curso, la compu jugará tus turnos."],
+    local: ["¿Salir de la partida?", "Se perderá la ronda en curso."]
+  }[U.modo] || ["¿Salir?", ""];
+  modal(`<h2>${textos[0]}</h2><p>${textos[1]}</p>`,
+    [{ txt: "Seguir jugando", cls: "primario", fn: cerrarCapa },
+     { txt: U.modo === "host" ? "Cerrar sala" : "Salir", cls: "peligro", fn: () => {
+       cerrarCapa();
+       if (U.modo === "host") { cerrarSala(); return; }
+       if (U.modo === "guest") {
+         try { if (Red.conn && Red.conn.open) Red.conn.send({ t: "adios" }); } catch (e) { /* nada */ }
+         guardar("centimo-invitado", null);
+         setTimeout(salirRed, 300);
+         U.V = null;
+       }
+       clearTimeout(relojMotor);
+       if (U.modo === "local") G = null;
+       U.modo = null; U.pantalla = "inicio"; pintar();
+     } }]);
 }
 
 /* ================= Capas (ventanas) ================= */
-function modal(html, botones, clase = "") {
+function modal(html, botones, clase = "", tipo = null) {
+  U.capaTipo = tipo;
   $capa.innerHTML = `<div class="capa ${clase}" role="dialog" aria-modal="true"><div class="caja">${html}
     <div class="botones">${botones.map((b, i) => `<button class="btn ${b.cls || ""}" data-b="${i}">${b.txt}</button>`).join("")}</div></div></div>`;
   $capa.querySelectorAll("[data-b]").forEach(el => el.onclick = () => botones[+el.dataset.b].fn());
   const f = $capa.querySelector(".btn.primario") || $capa.querySelector("button");
   if (f) f.focus();
 }
-function cerrarCapa() { $capa.innerHTML = ""; }
-function mostrarCortina() {
-  const j = actual();
-  const ult = S.bitacora.slice(0, 4).reverse();
+function cerrarCapa() { $capa.innerHTML = ""; U.capaTipo = null; }
+function mostrarCortina(j) {
+  const ult = G.bitacora.slice(0, 4).reverse();
   modal(`<p class="nota">Pasa el dispositivo a</p>
     <div class="grande-nombre">${esc(j.nombre)}</div>
     <p class="nota">Los demás, ¡no miren las cartas!</p>
     ${ult.length ? `<ul>${ult.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}`,
-    [{ txt: "Ver mis cartas", cls: "primario", fn: () => { cerrarCapa(); S.visible = true; S.mensaje = { texto: `${S.mensaje ? S.mensaje.texto.replace(/Turno de .*$/, "") : ""}Tu turno, ${j.nombre}.`, alerta: S.mensaje && S.mensaje.alerta }; render(); } }],
-    "cortina");
+    [{ txt: "Ver mis cartas", cls: "primario", fn: () => { cerrarCapa(); U.movVisto = G.mov; pintar(); } }],
+    "cortina", "cortina");
 }
 function mostrarReglas() {
   modal(`<h2>Cómo se juega Céntimo</h2>
@@ -544,179 +1301,32 @@ function mostrarReglas() {
     <p class="nota">Puntaje final: cada carta vale su número, las rojas valen el doble, las especiales 10 y los comodines 15. Menos puntos es mejor.</p>`,
     [{ txt: "Entendido", cls: "primario", fn: cerrarCapa }]);
 }
-function terminarRonda(gi) {
-  clearTimeout(reloj);
-  const g = S.jugadores[gi];
-  S.ocupado = true; S.ultima = null;
-  anotar(`${g.nombre}: "¡Presupuesto cerrado!"`);
-  const filas = S.jugadores.map(j => {
-    const p = j.hand.reduce((a, c) => a + puntos(c), 0);
-    j.total += p;
-    return { j, p };
-  }).sort((a, b) => a.p - b.p);
+function mostrarResultados(V) {
   const tag = p => p === 0 ? `<span class="tag cerrado">Presupuesto cerrado</span>` : p <= 25 ? `<span class="tag justo">Vas justo</span>` : `<span class="tag rojo">En rojo</span>`;
-  render();
-  modal(`<h2>¡${esc(g.nombre)} cerró su presupuesto!</h2>
-    <p class="nota">Ronda ${S.ronda}. Los demás suman los gastos que les quedaron en la mano.</p>
+  const manda = U.modo === "local" || U.modo === "host";
+  const botones = manda
+    ? [{ txt: "Jugar otra ronda", cls: "primario", fn: () => { cerrarCapa(); empezarRonda(); } },
+       U.modo === "host"
+         ? { txt: "Volver a la sala", fn: () => { cerrarCapa(); G.fase = "sala"; G.jugadores = G.jugadores.filter(j => j.bot || j.conectado); cambio(); } }
+         : { txt: "Volver al inicio", fn: () => { cerrarCapa(); G = null; U.modo = null; U.pantalla = "inicio"; pintar(); } }]
+    : [{ txt: "Ver la mesa", cls: "primario", fn: cerrarCapa }];
+  modal(`<h2>¡${esc(V.ganador || "")} cerró su presupuesto!</h2>
+    <p class="nota">Ronda ${V.ronda}. Los demás suman los gastos que les quedaron en la mano.</p>
     <div class="scroll-x"><table class="tabla">
       <thead><tr><th>Jugador</th><th>Resultado</th><th class="num">Ronda</th><th class="num">Total</th></tr></thead>
-      <tbody>${filas.map(f => `<tr><td>${esc(f.j.nombre)}</td><td>${tag(f.p)}</td><td class="num">${f.p}</td><td class="num">${f.j.total}</td></tr>`).join("")}</tbody>
+      <tbody>${(V.resultados || []).map(f => `<tr><td>${esc(f.nombre)}</td><td>${tag(f.puntos)}</td><td class="num">${f.puntos}</td><td class="num">${f.total}</td></tr>`).join("")}</tbody>
     </table></div>
-    <p class="leccion">Pagar primero lo necesario y mantener ahorro de respaldo reduce los gastos pendientes. Los gustos pesan el doble cuando se dejan acumular.</p>`,
-    [{ txt: "Jugar otra ronda", cls: "primario", fn: () => { cerrarCapa(); S.ronda++; empezarRonda(); } },
-     { txt: "Volver al inicio", fn: () => { cerrarCapa(); S.pantalla = "inicio"; render(); } }]);
-}
-
-/* ================= Dibujo ================= */
-function htmlCarta(c, extra = "", attrs = "") {
-  if (c.tipo === "num") {
-    return `<button class="carta c-${c.color} ${extra}" ${attrs} aria-label="${esc(CAT_SINGULAR[c.color] + ": " + nombreCarta(c))}"><span class="inner">
-      <span class="cat">${CAT_SINGULAR[c.color]}</span><span class="big">${c.valor}</span>
-      <span><span class="nm">${GASTOS[c.color][c.valor - 1]}</span><br><span class="amt">$${c.valor} mil</span></span></span></button>`;
-  }
-  const e = ESPECIALES[c.tipo];
-  return `<button class="carta c-${c.color} ${extra}" ${attrs} aria-label="${esc(e.nombre + ". " + e.efecto)}"><span class="inner">
-    <span class="cat">${CAT_SINGULAR[c.color]}</span><span class="big">${e.simbolo}</span>
-    <span><span class="nm">${e.nombre}</span><br><span class="amt">${e.corto}</span></span></span></button>`;
-}
-
-function render() {
-  if (S.pantalla === "inicio") return renderInicio();
-  renderJuego();
-}
-function renderInicio() {
-  const n = S.config.length;
-  $app.innerHTML = `<div class="portada">
-    <div class="logo"><div class="moneda" aria-hidden="true">¢</div>
-      <div><h1>Céntimo</h1><p>El juego de cartas de tu presupuesto del mes. Paga primero lo necesario, ahorra para los imprevistos y cierra tu mes antes que los demás.</p></div></div>
-    <div class="muestra" aria-hidden="true">
-      ${htmlCarta({ color: "b", tipo: "num", valor: 9 })}${htmlCarta({ color: "r", tipo: "num", valor: 5 })}
-      ${htmlCarta({ color: "g", tipo: "num", valor: 5 })}${htmlCarta({ color: "y", tipo: "num", valor: 4 })}
-      ${htmlCarta({ color: "k", tipo: "deuda" })}
-    </div>
-    <section class="panel" aria-labelledby="t-jug">
-      <h2 id="t-jug">¿Cuántos juegan?</h2>
-      <div class="contador">
-        <button class="btn redondo" id="menos" aria-label="Quitar jugador" ${n <= 2 ? "disabled" : ""}>−</button>
-        <span class="n" aria-live="polite">${n}</span>
-        <button class="btn redondo" id="mas" aria-label="Agregar jugador" ${n >= 10 ? "disabled" : ""}>+</button>
-        <span class="nota">de 2 a 10 jugadores</span>
-      </div>
-      <div class="lista-jug">${S.config.map((c, i) => `
-        <div class="fila-jug">
-          <input id="nombre-${i}" data-i="${i}" value="${esc(c.nombre)}" maxlength="16" aria-label="Nombre del jugador ${i + 1}">
-          <div class="seg" role="group" aria-label="Quién juega">
-            <button data-tipo="${i}" data-bot="0" aria-pressed="${!c.bot}">Persona</button>
-            <button data-tipo="${i}" data-bot="1" aria-pressed="${c.bot}">Compu</button>
-          </div>
-        </div>`).join("")}
-      </div>
-      <p class="nota">Las personas se pasan el mismo celular o computador por turnos. "Compu" es un jugador automático. ${n > 5 ? "Con 6 o más jugadores se usan dos mazos (112 cartas)." : ""}</p>
-      <div class="acciones-inicio">
-        <button class="btn primario" id="empezar">Empezar partida</button>
-        <button class="btn" id="reglas">Cómo se juega</button>
-        ${puedeInstalar() ? `<button class="btn" id="instalar">Instalar app</button>` : ""}
-      </div>
-    </section>
-  </div>`;
-  $app.querySelector("#menos").onclick = () => { S.config.pop(); guardarConfig(); render(); };
-  $app.querySelector("#mas").onclick = () => { S.config.push({ nombre: `Jugador ${S.config.length + 1}`, bot: false }); guardarConfig(); render(); };
-  $app.querySelectorAll("input[data-i]").forEach(inp => inp.oninput = () => { S.config[+inp.dataset.i].nombre = inp.value; guardarConfig(); });
-  $app.querySelectorAll("[data-tipo]").forEach(b => b.onclick = () => { S.config[+b.dataset.tipo].bot = b.dataset.bot === "1"; guardarConfig(); render(); });
-  $app.querySelector("#empezar").onclick = empezarPartida;
-  $app.querySelector("#reglas").onclick = mostrarReglas;
-  const bi = $app.querySelector("#instalar");
-  if (bi) bi.onclick = instalarApp;
-}
-
-function renderMensaje() {
-  const el = document.getElementById("mensaje");
-  if (!el || !S.mensaje) return;
-  el.className = "mensaje" + (S.mensaje.alerta ? " alerta" : "");
-  el.textContent = S.mensaje.texto;
-}
-
-function renderJuego() {
-  const j = actual();
-  const t = tope();
-  // Mano que se muestra: la del turno (si ya la destapó) o, si hay una sola persona, la suya.
-  let vi = null;
-  if (!j.bot && S.visible) vi = S.turno;
-  else if (humanos() === 1) vi = S.jugadores.findIndex(x => !x.bot);
-  const miTurno = vi === S.turno && !j.bot && S.visible && !S.ocupado;
-  const yo = vi !== null ? S.jugadores[vi] : null;
-  const necAviso = miTurno && yo.hand.some(c => c.color === "b" && puedeJugar(c)) && yo.hand.some(c => c.color === "r" && puedeJugar(c));
-
-  $app.innerHTML = `<div class="juego">
-    <div class="barra">
-      <div class="marca"><span class="moneda" aria-hidden="true">¢</span>Céntimo <span class="ronda">Ronda ${S.ronda}</span></div>
-      <div class="der"><button class="btn chico" id="b-reglas">Reglas</button><button class="btn chico" id="b-salir">Salir</button></div>
-    </div>
-
-    <div class="jugadores" aria-label="Jugadores">${S.jugadores.map((p, i) => `
-      <div class="chip ${i === S.turno ? "activo" : ""}">
-        <span class="nombre">${esc(p.nombre)}</span>
-        <span class="info"><i class="mini"></i>${p.hand.length} ${p.hand.length === 1 ? "carta" : "cartas"}</span>
-        <span class="info">${p.bot ? `<span class="badge bot">Compu</span>` : ""}${p.escudo ? `<span class="badge escudo">Escudo</span>` : ""}${p.hand.length === 1 ? `<span class="badge ultimo">Último gasto</span>` : ""}</span>
-      </div>`).join("")}
-    </div>
-
-    <div class="centro">
-      <div class="pila">
-        <button class="carta dorso" id="b-mazo" ${miTurno ? "" : "disabled"} aria-label="Robar una carta y pasar"><span class="inner"><span class="big">¢</span></span></button>
-        <small>Mazo · ${S.mazo.length}</small>
-      </div>
-      <div class="descarte">${htmlCarta(t, "grande", 'tabindex="-1" aria-disabled="true"')}<small>Carta en juego</small></div>
-      <div class="estado">
-        <span class="color-actual c-${S.color}"><i></i>Color: ${COLORES[S.color].nombre}</span>
-        <span class="sentido">Sentido: ${S.sentido === 1 ? "→ hacia la derecha" : "← hacia la izquierda"}</span>
-      </div>
-    </div>
-
-    <div class="mensaje ${S.mensaje && S.mensaje.alerta ? "alerta" : ""}" id="mensaje" aria-live="polite">${esc(S.mensaje ? S.mensaje.texto : "")}</div>
-
-    <section class="zona-mano" aria-label="Tu mano">
-      ${yo ? `
-        <div class="titulo"><h2>Cartas de ${esc(yo.nombre)}</h2>
-          ${miTurno ? `<p class="pista">Juega color <b>${COLORES[S.color].nombre}</b>${t.tipo === "num" ? ` o número <b>${t.valor}</b>` : ""}, o un comodín.</p>` : `<p class="pista">Espera tu turno…</p>`}
-        </div>
-        ${miTurno && acusacionValida() ? `<div class="acusar"><p><b>${esc(S.jugadores[S.acusable].nombre)}</b> quedó con una carta y no dijo "¡Último gasto!".</p><button class="btn peligro chico" id="b-acusar">Acusar: roba 2</button></div>` : ""}
-        ${necAviso ? `<div class="aviso-nec">Necesidades primero: tienes una carta azul que puedes pagar antes que tus Gustos.</div>` : ""}
-        <div class="mano">${yo.hand.map((c, i) => {
-          const cls = miTurno ? (puedeJugar(c) ? "jugable" : "nojugable") : "";
-          return htmlCarta(c, cls + (c.id === S.nuevaCarta ? " nueva" : ""), `data-c="${i}" ${miTurno ? "" : 'tabindex="-1"'}`);
-        }).join("")}</div>
-        ${miTurno ? `<div class="acciones">
-          <button class="btn" id="b-robar">Robar carta y pasar</button>
-          <button class="btn ${yo.dijo ? "dicho" : "primario"}" id="b-ultimo" ${yo.hand.length === 2 ? "" : "disabled"}>${yo.dijo ? "Dijiste: ¡Último gasto!" : "¡Último gasto!"}</button>
-        </div>` : ""}`
-      : `<p class="espera">Las cartas están ocultas hasta que el próximo jugador las destape.</p>`}
-    </section>
-
-    <ul class="bitacora" aria-label="Lo que ha pasado">${S.bitacora.slice(0, 5).map(x => `<li>${esc(x)}</li>`).join("")}</ul>
-  </div>`;
-
-  $app.querySelector("#b-reglas").onclick = mostrarReglas;
-  $app.querySelector("#b-salir").onclick = () => modal(`<h2>¿Salir de la partida?</h2><p>Se perderá la ronda en curso.</p>`,
-    [{ txt: "Seguir jugando", cls: "primario", fn: cerrarCapa },
-     { txt: "Salir", cls: "peligro", fn: () => { clearTimeout(reloj); cerrarCapa(); S.pantalla = "inicio"; render(); } }]);
-  if (miTurno) {
-    $app.querySelectorAll("[data-c]").forEach(el => el.onclick = () => tocarCarta(+el.dataset.c, el));
-    $app.querySelector("#b-mazo").onclick = robarYPasar;
-    $app.querySelector("#b-robar").onclick = robarYPasar;
-    $app.querySelector("#b-ultimo").onclick = () => { yo.dijo = true; S.mensaje = { texto: `${yo.nombre}: "¡Último gasto!" Ahora juega tu penúltima carta.` }; render(); };
-    const ba = $app.querySelector("#b-acusar");
-    if (ba) ba.onclick = acusar;
-  }
+    <p class="leccion">Pagar primero lo necesario y mantener ahorro de respaldo reduce los gastos pendientes. Los gustos pesan el doble cuando se dejan acumular.</p>
+    ${manda ? "" : `<p class="esperando">Esperando que el anfitrión empiece otra ronda…</p>`}`,
+    botones, "", "fin");
 }
 
 /* ================= App instalable ================= */
 let avisoInstalar = null;
 const esApp = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
-const enMarco = () => { try { return window.self !== window.top; } catch (e) { return true; } };
 function puedeInstalar() { return !esApp() && !enMarco() && location.protocol !== "file:"; }
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); avisoInstalar = e; });
-window.addEventListener("appinstalled", () => { avisoInstalar = null; if (S.pantalla === "inicio") render(); });
+window.addEventListener("appinstalled", () => { avisoInstalar = null; if (U.pantalla === "inicio") pintar(); });
 function instalarApp() {
   if (avisoInstalar) {
     avisoInstalar.prompt();
@@ -728,14 +1338,22 @@ function instalarApp() {
     ${ios
       ? `<p>En iPhone o iPad, desde <b>Safari</b>:</p><ol><li>Toca el botón <b>Compartir</b> (el cuadrado con una flecha hacia arriba).</li><li>Elige <b>Agregar a inicio</b>.</li><li>Toca <b>Agregar</b>.</li></ol>`
       : `<p>En Android, desde <b>Chrome</b>:</p><ol><li>Toca el menú <b>⋮</b> arriba a la derecha.</li><li>Elige <b>Instalar app</b> o <b>Agregar a la pantalla principal</b>.</li></ol><p>En computador, busca el ícono de instalar en la barra de direcciones.</p>`}
-    <p class="nota">Céntimo aparecerá con su ícono junto a tus otras apps y funcionará sin internet.</p>`,
+    <p class="nota">Céntimo aparecerá con su ícono junto a tus otras apps. El modo de un solo dispositivo funciona sin internet; para jugar cada uno en su celular se necesita internet.</p>`,
     [{ txt: "Entendido", cls: "primario", fn: cerrarCapa }]);
 }
 if ("serviceWorker" in navigator && location.protocol !== "file:" && !enMarco()) {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
 
-render();
+/* Si el invitado recarga la página (o vuelve a abrir el link), vuelve solo a su sala. */
+(function volverSolo() {
+  const inv = leer("centimo-invitado");
+  if (U.codigoPre && inv && inv.codigo === U.codigoPre && inv.t && Date.now() - inv.t < 3 * 3600 * 1000 && enLineaPosible()) {
+    unirseSala(inv.codigo, inv.nombre);
+    return;
+  }
+  pintar();
+})();
 </script>
 </body>
 </html>

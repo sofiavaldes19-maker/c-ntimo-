@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Céntimo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@400;600;700&display=swap">
+<style>
+/* Layout: una mesa de juego a pantalla completa — jugadores arriba, mesa al centro, tu mano abajo. */
+:root {
+  --mesa: #151a2c;
+  --mesa-2: #1e2540;
+  --linea: #323a5c;
+  --texto: #eef0f8;
+  --suave: #a3a9c4;
+  --oro: #f4b83a;
+  --oro-tinta: #2a1d00;
+  --ahorro: #2f9c5e;
+  --necesidad: #2f6fd6;
+  --gusto: #d9443b;
+  --ingreso: #f2b630;
+  --comodin: #14161d;
+  --papel: #fffdf7;
+  --display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(ellipse at 50% 40%, var(--mesa-2), var(--mesa) 70%) fixed, var(--mesa);
+  color: var(--texto);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--oro); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 16px 32px; }
+
+/* Botones */
+.btn {
+  border: 0; border-radius: 12px; padding: 12px 18px; font-weight: 700;
+  background: var(--mesa-2); color: var(--texto); box-shadow: inset 0 0 0 1px var(--linea);
+  min-height: 48px;
+}
+.btn:hover { box-shadow: inset 0 0 0 2px var(--suave); }
+.btn.primario { background: var(--oro); color: var(--oro-tinta); box-shadow: 0 4px 0 #b9821a; }
+.btn.primario:hover { filter: brightness(1.05); }
+.btn.primario:active { transform: translateY(2px); box-shadow: 0 2px 0 #b9821a; }
+.btn.peligro { background: var(--gusto); color: #fff; box-shadow: none; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.chico { min-height: 36px; padding: 6px 12px; font-size: 14px; }
+
+/* ---------- Inicio ---------- */
+.portada { display: grid; gap: 24px; }
+.logo { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.moneda {
+  width: 64px; height: 64px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 35% 30%, #ffe08a, var(--oro) 55%, #b9821a);
+  display: grid; place-items: center; font-family: var(--display); font-weight: 800; font-size: 30px; color: var(--oro-tinta);
+  box-shadow: 0 0 0 4px #b9821a55;
+}
+.logo h1 { font-size: clamp(44px, 9vw, 72px); font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+.logo p { margin: 4px 0 0; color: var(--suave); max-width: 46ch; }
+.panel { background: #0f1322cc; border: 1px solid var(--linea); border-radius: 18px; padding: 20px; display: grid; gap: 16px; }
+.panel h2 { font-size: 22px; }
+.contador { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.contador .n { font-family: var(--display); font-size: 40px; font-weight: 800; min-width: 2ch; text-align: center; font-variant-numeric: tabular-nums; }
+.contador .redondo { width: 48px; height: 48px; border-radius: 50%; padding: 0; font-size: 24px; }
+.lista-jug { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.fila-jug { display: flex; gap: 8px; align-items: center; background: var(--mesa); border: 1px solid var(--linea); border-radius: 12px; padding: 8px; }
+.fila-jug input {
+  flex: 1; min-width: 0; background: transparent; border: 0; color: var(--texto); font: inherit; font-weight: 600; padding: 8px;
+}
+.seg { display: flex; border-radius: 10px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--linea); flex: none; }
+.seg button { border: 0; background: transparent; padding: 8px 10px; font-size: 13px; font-weight: 700; color: var(--suave); }
+.seg button[aria-pressed="true"] { background: var(--oro); color: var(--oro-tinta); }
+.nota { color: var(--suave); font-size: 14px; margin: 0; }
+.acciones-inicio { display: flex; gap: 12px; flex-wrap: wrap; }
+.acciones-inicio .primario { flex: 1 1 220px; font-size: 18px; }
+.muestra { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ---------- Cartas ---------- */
+.carta {
+  --cc: var(--comodin);
+  --w: clamp(66px, 17vw, 92px);
+  width: var(--w); aspect-ratio: 5 / 7.4; max-width: 100%;
+  border: 0; border-radius: 12px; padding: 5px;
+  background: var(--cc); color: #fff;
+  display: grid; grid-template-rows: auto 1fr auto; position: relative;
+  box-shadow: 0 3px 0 #0006, 0 8px 18px #0005;
+  transition: transform .15s ease, opacity .15s ease, box-shadow .15s;
+  text-align: center; flex: none;
+}
+.carta .inner {
+  grid-row: 1 / -1; grid-column: 1; background: var(--papel); color: var(--cc); border-radius: 8px;
+  display: grid; grid-template-rows: auto 1fr auto; padding: 4px 3px; min-height: 0; overflow: hidden;
+}
+.carta .cat { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; line-height: 1.1; }
+.carta .big { font-family: var(--display); font-weight: 800; font-size: calc(var(--w) * .46); line-height: 1; align-self: center; }
+.carta .nm { font-size: 10px; font-weight: 700; line-height: 1.15; color: #262a3a; }
+.carta .amt { font-size: 9px; color: #5b6075; line-height: 1.15; }
+.c-g { --cc: var(--ahorro); } .c-b { --cc: var(--necesidad); } .c-r { --cc: var(--gusto); }
+.c-y { --cc: #c48a0c; background: var(--ingreso); }
+.c-k { background: conic-gradient(var(--ahorro) 0 25%, var(--necesidad) 0 50%, var(--gusto) 0 75%, var(--ingreso) 0); }
+.c-k .inner { background: var(--comodin); color: #fff; }
+.c-k .nm { color: #fff; } .c-k .amt { color: #c5c9da; }
+.carta.dorso { background: repeating-linear-gradient(45deg, #2a3358 0 8px, #222a4a 8px 16px); }
+.carta.dorso .inner { background: transparent; color: var(--oro); place-items: center; grid-template-rows: 1fr; }
+.carta.grande { --w: clamp(96px, 26vw, 128px); }
+.carta.grande .cat { font-size: 11px; } .carta.grande .nm { font-size: 13px; } .carta.grande .amt { font-size: 11px; }
+
+.mano .carta.jugable { transform: translateY(-8px); box-shadow: 0 0 0 3px var(--oro), 0 10px 20px #0007; }
+.mano .carta.jugable:hover { transform: translateY(-14px); }
+.mano .carta.nojugable { opacity: .45; }
+.mano .carta.nueva { animation: nueva .6s ease; }
+@keyframes nueva { from { transform: translateY(-40px) scale(1.1); } }
+.sacude { animation: sacude .35s; }
+@keyframes sacude { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+/* ---------- Juego ---------- */
+.juego { display: grid; gap: 14px; }
+.barra { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
+.barra .marca { display: flex; gap: 10px; align-items: center; font-family: var(--display); font-weight: 800; font-size: 22px; }
+.barra .marca .moneda { width: 34px; height: 34px; font-size: 16px; box-shadow: none; }
+.barra .ronda { color: var(--suave); font-size: 14px; font-family: var(--body); font-weight: 600; }
+.barra .der { display: flex; gap: 8px; }
+
+.jugadores { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: thin; }
+.chip {
+  flex: none; display: grid; gap: 2px; min-width: 104px; padding: 8px 10px; border-radius: 12px;
+  background: var(--mesa); border: 1px solid var(--linea);
+}
+.chip.activo { border-color: var(--oro); box-shadow: 0 0 0 2px var(--oro); }
+.chip .nombre { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+.chip .info { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--suave); font-variant-numeric: tabular-nums; }
+.chip .mini { width: 10px; height: 14px; border-radius: 2px; background: #3a4470; box-shadow: inset 0 0 0 1px #6873a6; }
+.badge { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 99px; }
+.badge.escudo { background: var(--ahorro); color: #fff; }
+.badge.ultimo { background: var(--gusto); color: #fff; }
+.badge.bot { background: #3a4470; color: #dfe3f5; }
+
+.centro { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 10px 0; }
+.pila { justify-self: end; display: grid; gap: 6px; justify-items: center; }
+.pila .carta.dorso { cursor: pointer; }
+.pila .carta.dorso:disabled { cursor: default; }
+.pila small, .descarte small { color: var(--suave); font-size: 12px; font-variant-numeric: tabular-nums; }
+.descarte { display: grid; gap: 6px; justify-items: center; }
+.estado { display: grid; gap: 8px; justify-items: start; min-width: 0; }
+.color-actual { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 99px; background: var(--mesa); border: 1px solid var(--linea); font-weight: 700; font-size: 14px; }
+.color-actual i { width: 22px; height: 22px; border-radius: 50%; background: var(--cc); display: block; }
+.sentido { color: var(--suave); font-size: 14px; }
+
+.mensaje {
+  background: var(--papel); color: #20243a; border-radius: 14px; padding: 12px 16px;
+  font-weight: 600; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; min-height: 52px;
+}
+.mensaje.alerta { background: #ffe1dd; color: #6b140e; }
+.mensaje .quien { font-family: var(--display); font-weight: 800; font-size: 20px; }
+
+.zona-mano { background: #0f1322cc; border: 1px solid var(--linea); border-radius: 18px; padding: 14px; display: grid; gap: 12px; }
+.zona-mano .titulo { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.zona-mano h2 { font-size: 20px; }
+.pista { color: var(--suave); font-size: 14px; margin: 0; }
+.pista b { color: var(--texto); }
+.aviso-nec { background: #1f3a73; color: #dbe7ff; border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 600; }
+.mano { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 10px; min-height: 120px; align-items: flex-end; }
+.acciones { display: flex; gap: 10px; flex-wrap: wrap; }
+.acciones .btn { flex: 1 1 160px; }
+.btn.dicho { background: var(--ahorro); color: #fff; box-shadow: none; }
+.acusar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #3b1714; border: 1px solid var(--gusto); border-radius: 12px; padding: 10px 12px; }
+.acusar p { margin: 0; flex: 1 1 200px; }
+.espera { color: var(--suave); padding: 20px 0; text-align: center; }
+
+.bitacora { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 14px; color: var(--suave); }
+.bitacora li:first-child { color: var(--texto); }
+
+/* ---------- Capas ---------- */
+.capa {
+  position: fixed; inset: 0; z-index: 20; background: #080a12e6; display: grid; place-items: center; overflow-y: auto;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.caja { background: var(--mesa-2); border: 1px solid var(--linea); border-radius: 20px; padding: 22px; width: min(560px, 100%); display: grid; gap: 14px; }
+.caja h2 { font-size: 26px; }
+.caja p { margin: 0; }
+.caja .botones { display: flex; gap: 10px; flex-wrap: wrap; }
+.caja .botones .btn { flex: 1 1 160px; }
+.cortina .caja { text-align: center; justify-items: center; }
+.cortina .grande-nombre { font-family: var(--display); font-weight: 800; font-size: clamp(36px, 9vw, 56px); line-height: 1.05; color: var(--oro); }
+.cortina ul { text-align: left; color: var(--suave); font-size: 14px; margin: 0; padding-left: 18px; }
+.elige-color { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.elige-color button { border: 0; border-radius: 14px; padding: 18px 10px; font-weight: 800; font-size: 17px; color: #fff; background: var(--cc); }
+.elige-color button small { display: block; font-weight: 600; font-size: 12px; opacity: .85; }
+.elige-color .c-y { color: var(--oro-tinta); }
+.reglas ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; }
+.reglas li b { color: var(--oro); }
+.tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tabla th, .tabla td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--linea); }
+.tabla td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+.tabla th.num { text-align: right; }
+.tag { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.tag.cerrado { background: var(--ahorro); color: #fff; }
+.tag.justo { background: var(--ingreso); color: var(--oro-tinta); }
+.tag.rojo { background: var(--gusto); color: #fff; }
+.scroll-x { overflow-x: auto; }
+.leccion { background: var(--papel); color: #20243a; border-radius: 12px; padding: 12px 14px; font-size: 14px; }
+
+@media (max-width: 560px) {
+  .centro { grid-template-columns: auto auto; justify-content: center; }
+  .estado { grid-column: 1 / -1; justify-items: center; }
+  .pila { justify-self: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div id="capa"></div>
+
+<script>
+"use strict";
+/* ================= Datos del mazo ================= */
+const COLORES = {
+  g: { nombre: "Ahorro", corto: "Verde", desc: "te da escudo" },
+  b: { nombre: "Necesidades", corto: "Azul", desc: "se pagan primero" },
+  r: { nombre: "Gustos", corto: "Rojo", desc: "valen el doble" },
+  y: { nombre: "Ingresos", corto: "Amarillo", desc: "sueldo y extras" }
+};
+const CAT_SINGULAR = { g: "Ahorro", b: "Necesidad", r: "Gusto", y: "Ingreso", k: "Comodín" };
+const GASTOS = {
+  g: ["Alcancía", "Monedas sueltas", "Cuenta de ahorro", "Ahorro automático", "Fondo de emergencia", "Depósito a plazo", "Meta de viaje", "Ahorro para estudios", "Colchón financiero"],
+  b: ["Pasaje de bus", "Útiles", "Agua y luz", "Internet", "Supermercado", "Pase de transporte", "Remedios", "Almuerzos", "Arriendo"],
+  r: ["Café", "Snack", "Streaming", "Cine", "Delivery", "Salida con amigos", "Ropa", "Concierto", "Celular nuevo"],
+  y: ["Venta de algo usado", "Propina", "Clases particulares", "Mesada", "Turno extra", "Trabajo freelance", "Beca", "Práctica pagada", "Sueldo"]
+};
+const ESPECIALES = {
+  imp:    { nombre: "Imprevisto", simbolo: "+2", corto: "Roba 2 y pierde turno", efecto: "El siguiente roba 2 y pierde su turno" },
+  cong:   { nombre: "Congelar cuenta", simbolo: "⊘", corto: "Pierde turno", efecto: "El siguiente pierde su turno" },
+  camb:   { nombre: "Cambio de plan", simbolo: "⇄", corto: "Cambia el sentido", efecto: "Cambia el sentido del juego" },
+  sueldo: { nombre: "Sueldo extra", simbolo: "★", corto: "Elige color", efecto: "Eliges el color que sigue" },
+  deuda:  { nombre: "Deuda", simbolo: "+4", corto: "Roba 4 · elige color", efecto: "Eliges color; el siguiente roba 4 y pierde su turno" }
+};
+
+let idCarta = 0;
+function crearMazo(copias) {
+  const m = [];
+  for (let k = 0; k < copias; k++) {
+    for (const c of ["g", "b", "r", "y"]) {
+      for (let v = 1; v <= 9; v++) m.push({ id: idCarta++, color: c, tipo: "num", valor: v });
+      for (const t of ["imp", "cong", "camb"]) m.push({ id: idCarta++, color: c, tipo: t });
+    }
+    for (let i = 0; i < 4; i++) m.push({ id: idCarta++, color: "k", tipo: "sueldo" });
+    for (let i = 0; i < 4; i++) m.push({ id: idCarta++, color: "k", tipo: "deuda" });
+  }
+  return m; // 56 cartas por copia
+}
+function barajar(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function nombreCarta(c) {
+  if (c.tipo === "num") return `${GASTOS[c.color][c.valor - 1]} ($${c.valor} mil)`;
+  return ESPECIALES[c.tipo].nombre + (c.color !== "k" ? ` ${CAT_SINGULAR[c.color].toLowerCase()}` : "");
+}
+function puntos(c) {
+  const base = c.tipo === "num" ? c.valor : (c.color === "k" ? 15 : 10);
+  return c.color === "r" ? base * 2 : base;
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])); }
+
+/* ================= Estado ================= */
+const S = {
+  pantalla: "inicio",
+  config: [],
+  jugadores: [], mazo: [], descarte: [], turno: 0, sentido: 1, color: "b",
+  visible: false, acusable: null, ultima: null, ronda: 1, bitacora: [], ocupado: false,
+  mensaje: null, nuevaCarta: null
+};
+let reloj = null;
+
+function cargarConfig() {
+  try {
+    const g = JSON.parse(localStorage.getItem("centimo-config") || "null");
+    if (Array.isArray(g) && g.length >= 2) return g.slice(0, 10);
+  } catch (e) { /* sin almacenamiento */ }
+  return [
+    { nombre: "Jugador 1", bot: false }, { nombre: "Jugador 2", bot: false },
+    { nombre: "Jugador 3", bot: false }, { nombre: "Jugador 4", bot: false },
+    { nombre: "Jugador 5", bot: false }, { nombre: "Jugador 6", bot: false }
+  ];
+}
+function guardarConfig() { try { localStorage.setItem("centimo-config", JSON.stringify(S.config)); } catch (e) { /* nada */ } }
+S.config = cargarConfig();
+
+const $app = document.getElementById("app");
+const $capa = document.getElementById("capa");
+const actual = () => S.jugadores[S.turno];
+const humanos = () => S.jugadores.filter(j => !j.bot).length;
+const tope = () => S.descarte[S.descarte.length - 1];
+function sig(pasos) { const n = S.jugadores.length; return (((S.turno + S.sentido * pasos) % n) + n) % n; }
+function anotar(t) { S.bitacora.unshift(t); S.bitacora.length = Math.min(S.bitacora.length, 40); }
+
+function puedeJugar(c) {
+  if (c.color === "k") return true;
+  if (c.color === S.color) return true;
+  const t = tope();
+  if (c.tipo === "num" && t.tipo === "num") return c.valor === t.valor;
+  return c.tipo !== "num" && c.tipo === t.tipo;
+}
+function tieneNecesidadJugable(j, salvo) {
+  return j.hand.some((c, i) => i !== salvo && c.color === "b" && puedeJugar(c));
+}
+function robar(j, n) {
+  const got = [];
+  for (let i = 0; i < n; i++) {
+    if (!S.mazo.length) {
+      if (S.descarte.length <= 1) break;
+      const t = S.descarte.pop();
+      S.mazo = barajar(S.descarte);
+      S.descarte = [t];
+      anotar("Se acabó el mazo: se barajó la pila de descarte.");
+    }
+    got.push(S.mazo.pop());
+  }
+  j.hand.push(...got);
+  return got;
+}
+
+/* ================= Flujo de la partida ================= */
+function empezarPartida() {
+  S.jugadores = S.config.map((c, i) => ({ nombre: (c.nombre || "").trim() || `Jugador ${i + 1}`, bot: c.bot, hand: [], escudo: false, dijo: false, total: 0 }));
+  S.ronda = 1;
+  empezarRonda();
+}
+function empezarRonda() {
+  clearTimeout(reloj);
+  const n = S.jugadores.length;
+  const copias = n > 5 ? 2 : 1;
+  S.mazo = barajar(crearMazo(copias));
+  S.jugadores.forEach(j => { j.hand = []; j.escudo = false; j.dijo = false; });
+  for (let r = 0; r < 7; r++) S.jugadores.forEach(j => j.hand.push(S.mazo.pop()));
+  let c = S.mazo.pop();
+  while (c.tipo !== "num") { S.mazo.unshift(c); c = S.mazo.pop(); }
+  S.descarte = [c]; S.color = c.color; S.sentido = 1;
+  S.turno = (S.ronda - 1) % n;
+  S.acusable = null; S.bitacora = []; S.ocupado = false; S.mensaje = null; S.ultima = null;
+  anotar(`Ronda ${S.ronda}: cada jugador recibe 7 gastos. Se da vuelta ${nombreCarta(c)}.`);
+  if (copias > 1) anotar(`Son ${n} jugadores: se juega con dos mazos (112 cartas).`);
+  S.pantalla = "juego";
+  iniciarTurno();
+}
+function iniciarTurno() {
+  clearTimeout(reloj);
+  S.visible = false; S.ocupado = false; S.nuevaCarta = null;
+  const j = actual();
+  const previo = S.ultima ? S.ultima.texto + " " : "";
+  const alerta = !!(S.ultima && S.ultima.alerta);
+  S.ultima = null;
+  if (j.bot) {
+    S.mensaje = { texto: `${previo}Ahora juega ${j.nombre}…`, alerta };
+    render();
+    reloj = setTimeout(turnoBot, 1100);
+  } else if (humanos() > 1) {
+    S.mensaje = { texto: `${previo}Turno de ${j.nombre}.`, alerta };
+    render();
+    mostrarCortina();
+  } else {
+    S.visible = true;
+    S.mensaje = { texto: `${previo}Tu turno, ${j.nombre}.`, alerta };
+    render();
+  }
+}
+function acusacionValida() {
+  return S.acusable !== null && S.acusable !== S.turno && S.jugadores[S.acusable].hand.length === 1;
+}
+function acusar() {
+  const t = S.jugadores[S.acusable];
+  robar(t, 2);
+  anotar(`${actual().nombre} pilló a ${t.nombre}: no dijo "¡Último gasto!" y roba 2.`);
+  S.mensaje = { texto: `¡${t.nombre} roba 2 por no decir "¡Último gasto!"!`, alerta: true };
+  S.acusable = null;
+  render();
+}
+
+function jugar(pi, idx, elegido) {
+  const j = S.jugadores[pi];
+  const c = j.hand[idx];
+  const castigo = c.color === "r" && tieneNecesidadJugable(j, idx);
+  S.acusable = null;
+  j.hand.splice(idx, 1);
+  S.descarte.push(c);
+  S.color = c.color === "k" ? elegido : c.color;
+  let txt = `${j.nombre} jugó ${nombreCarta(c)}`;
+  if (c.color === "k") txt += ` y eligió ${COLORES[elegido].nombre}`;
+  anotar(txt + ".");
+  let alerta = false;
+  if (c.color === "g") { j.escudo = true; anotar(`${j.nombre} dijo "¡ahorro!": queda protegido del próximo Imprevisto o Deuda.`); }
+  if (castigo) {
+    robar(j, 2); alerta = true;
+    anotar(`Castigo "Necesidades primero": ${j.nombre} pagó un Gusto teniendo una Necesidad pendiente y roba 2.`);
+  }
+  if (j.hand.length === 1 && !j.dijo) S.acusable = pi;
+  if (j.hand.length === 1 && j.dijo) anotar(`${j.nombre}: "¡Último gasto!"`);
+  j.dijo = false;
+
+  let salta = false;
+  const ni = sig(1), nj = S.jugadores[ni];
+  if (c.tipo === "imp" || c.tipo === "deuda") {
+    const n = c.tipo === "imp" ? 2 : 4;
+    if (nj.escudo) { nj.escudo = false; anotar(`${nj.nombre} usó su escudo de ahorro: no roba ni pierde el turno.`); }
+    else { robar(nj, n); salta = true; anotar(`${nj.nombre} roba ${n} y pierde su turno.`); alerta = true; }
+  } else if (c.tipo === "cong") {
+    salta = true; anotar(`${nj.nombre} pierde su turno.`);
+  } else if (c.tipo === "camb") {
+    S.sentido *= -1;
+    if (S.jugadores.length === 2) salta = true;
+    anotar("Cambio de plan: el juego cambia de sentido.");
+  }
+  if (j.hand.length === 0) { terminarRonda(pi); return; }
+  S.ultima = { texto: S.bitacora.slice(0, 3).reverse().join(" "), alerta };
+  S.turno = sig(salta ? 2 : 1);
+  iniciarTurno();
+}
+function robarYPasar() {
+  const j = actual();
+  S.acusable = null;
+  const got = robar(j, 1);
+  j.dijo = false;
+  anotar(`${j.nombre} no pudo pagar: robó una carta y pasó.`);
+  S.ultima = { texto: `${j.nombre} robó una carta y pasó.` };
+  if (j.bot || !got.length) { S.turno = sig(1); iniciarTurno(); return; }
+  S.ocupado = true; S.nuevaCarta = got[0].id;
+  S.mensaje = { texto: `Robaste: ${nombreCarta(got[0])}. Pasa el turno…` };
+  render();
+  reloj = setTimeout(() => { S.turno = sig(1); iniciarTurno(); }, 1300);
+}
+
+/* ================= Computadora ================= */
+function turnoBot() {
+  const j = actual();
+  if (acusacionValida() && Math.random() < 0.6) acusar();
+  const ops = j.hand.map((c, i) => i).filter(i => puedeJugar(j.hand[i]));
+  if (!ops.length) { robarYPasar(); return; }
+  const hayAzul = ops.some(i => j.hand[i].color === "b");
+  const cand = ops.filter(i => !(hayAzul && j.hand[i].color === "r"));
+  const amenaza = S.jugadores[sig(1)].hand.length <= 2;
+  const valor = c => {
+    if (c.tipo === "num") return c.valor + (c.color === "b" ? 6 : 0) + (c.color === "r" ? c.valor : 0) + (c.color === "g" && !j.escudo ? 4 : 0);
+    if (c.tipo === "imp" || c.tipo === "cong") return amenaza ? 50 : 12;
+    if (c.tipo === "camb") return 9;
+    if (c.tipo === "deuda") return amenaza ? 60 : 1;
+    return 0.5; // sueldo extra: se guarda para el final
+  };
+  let mejor = cand[0];
+  for (const i of cand) if (valor(j.hand[i]) > valor(j.hand[mejor])) mejor = i;
+  let elegido;
+  if (j.hand[mejor].color === "k") {
+    const cuenta = { g: 0, b: 0, r: 0, y: 0 };
+    j.hand.forEach((c, i) => { if (i !== mejor && c.color !== "k") cuenta[c.color]++; });
+    elegido = Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a])[0];
+    if (!cuenta[elegido]) elegido = "b";
+  }
+  if (j.hand.length === 2 && Math.random() < 0.85) j.dijo = true;
+  jugar(S.turno, mejor, elegido);
+}
+
+/* ================= Acciones de la persona ================= */
+function tocarCarta(idx, el) {
+  if (S.ocupado || !S.visible || actual().bot) return;
+  const j = actual(), c = j.hand[idx];
+  if (!puedeJugar(c)) {
+    el.classList.remove("sacude"); void el.offsetWidth; el.classList.add("sacude");
+    const t = tope();
+    S.mensaje = { texto: `Esa carta no combina. Necesitas color ${COLORES[S.color].nombre}${t.tipo === "num" ? ` o el número ${t.valor}` : ` u otra carta "${ESPECIALES[t.tipo].nombre}"`}, o un comodín.`, alerta: true };
+    renderMensaje();
+    return;
+  }
+  const seguir = () => c.color === "k" ? elegirColor(col => jugar(S.turno, idx, col)) : jugar(S.turno, idx);
+  if (c.color === "r" && tieneNecesidadJugable(j, idx)) {
+    modal(`<h2>Necesidades primero</h2>
+      <p>Tienes una carta <b>azul (Necesidad)</b> que puedes pagar ahora. Si juegas este Gusto, <b>robas 2 cartas de castigo</b>.</p>`,
+      [{ txt: "Volver y elegir otra", cls: "primario", fn: cerrarCapa },
+       { txt: "Jugar el Gusto igual (+2)", cls: "peligro", fn: () => { cerrarCapa(); seguir(); } }]);
+    return;
+  }
+  seguir();
+}
+function elegirColor(fn) {
+  modal(`<h2>¿Qué color sigue?</h2>
+    <div class="elige-color">${Object.keys(COLORES).map(k => `<button class="c-${k}" data-col="${k}">${COLORES[k].nombre}<small>${COLORES[k].corto}</small></button>`).join("")}</div>`,
+    [{ txt: "Cancelar", fn: cerrarCapa }]);
+  $capa.querySelectorAll("[data-col]").forEach(b => b.onclick = () => { cerrarCapa(); fn(b.dataset.col); });
+}
+
+/* ================= Capas (ventanas) ================= */
+function modal(html, botones, clase = "") {
+  $capa.innerHTML = `<div class="capa ${clase}" role="dialog" aria-modal="true"><div class="caja">${html}
+    <div class="botones">${botones.map((b, i) => `<button class="btn ${b.cls || ""}" data-b="${i}">${b.txt}</button>`).join("")}</div></div></div>`;
+  $capa.querySelectorAll("[data-b]").forEach(el => el.onclick = () => botones[+el.dataset.b].fn());
+  const f = $capa.querySelector(".btn.primario") || $capa.querySelector("button");
+  if (f) f.focus();
+}
+function cerrarCapa() { $capa.innerHTML = ""; }
+function mostrarCortina() {
+  const j = actual();
+  const ult = S.bitacora.slice(0, 4).reverse();
+  modal(`<p class="nota">Pasa el dispositivo a</p>
+    <div class="grande-nombre">${esc(j.nombre)}</div>
+    <p class="nota">Los demás, ¡no miren las cartas!</p>
+    ${ult.length ? `<ul>${ult.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}`,
+    [{ txt: "Ver mis cartas", cls: "primario", fn: () => { cerrarCapa(); S.visible = true; S.mensaje = { texto: `${S.mensaje ? S.mensaje.texto.replace(/Turno de .*$/, "") : ""}Tu turno, ${j.nombre}.`, alerta: S.mensaje && S.mensaje.alerta }; render(); } }],
+    "cortina");
+}
+function mostrarReglas() {
+  modal(`<h2>Cómo se juega Céntimo</h2>
+    <p>Eres un estudiante que empieza el mes con 7 gastos pendientes. Gana quien deja su mano en cero: <b>cierra su presupuesto</b>.</p>
+    <div class="reglas"><ol>
+      <li><b>Combina.</b> Juega una carta del mismo color (categoría) o del mismo número (monto) que la del centro. Si no puedes, roba una carta y pasa.</li>
+      <li><b>Necesidades primero.</b> Si juegas un Gusto rojo teniendo una Necesidad azul que podías jugar, robas 2 cartas de castigo.</li>
+      <li><b>Escudo de ahorro.</b> Al jugar una carta verde quedas protegido: el próximo Imprevisto o Deuda que te lancen no te afecta.</li>
+      <li><b>Especiales.</b> Imprevisto (+2 y pierde turno), Congelar cuenta (pierde turno), Cambio de plan (cambia el sentido). Los comodines Sueldo extra y Deuda (+4) se juegan siempre.</li>
+      <li><b>¡Último gasto!</b> Antes de quedar con una carta, toca el botón. Si lo olvidas, el siguiente jugador puede acusarte y robas 2.</li>
+    </ol></div>
+    <p class="nota">Puntaje final: cada carta vale su número, las rojas valen el doble, las especiales 10 y los comodines 15. Menos puntos es mejor.</p>`,
+    [{ txt: "Entendido", cls: "primario", fn: cerrarCapa }]);
+}
+function terminarRonda(gi) {
+  clearTimeout(reloj);
+  const g = S.jugadores[gi];
+  S.ocupado = true; S.ultima = null;
+  anotar(`${g.nombre}: "¡Presupuesto cerrado!"`);
+  const filas = S.jugadores.map(j => {
+    const p = j.hand.reduce((a, c) => a + puntos(c), 0);
+    j.total += p;
+    return { j, p };
+  }).sort((a, b) => a.p - b.p);
+  const tag = p => p === 0 ? `<span class="tag cerrado">Presupuesto cerrado</span>` : p <= 25 ? `<span class="tag justo">Vas justo</span>` : `<span class="tag rojo">En rojo</span>`;
+  render();
+  modal(`<h2>¡${esc(g.nombre)} cerró su presupuesto!</h2>
+    <p class="nota">Ronda ${S.ronda}. Los demás suman los gastos que les quedaron en la mano.</p>
+    <div class="scroll-x"><table class="tabla">
+      <thead><tr><th>Jugador</th><th>Resultado</th><th class="num">Ronda</th><th class="num">Total</th></tr></thead>
+      <tbody>${filas.map(f => `<tr><td>${esc(f.j.nombre)}</td><td>${tag(f.p)}</td><td class="num">${f.p}</td><td class="num">${f.j.total}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <p class="leccion">Pagar primero lo necesario y mantener ahorro de respaldo reduce los gastos pendientes. Los gustos pesan el doble cuando se dejan acumular.</p>`,
+    [{ txt: "Jugar otra ronda", cls: "primario", fn: () => { cerrarCapa(); S.ronda++; empezarRonda(); } },
+     { txt: "Volver al inicio", fn: () => { cerrarCapa(); S.pantalla = "inicio"; render(); } }]);
+}
+
+/* ================= Dibujo ================= */
+function htmlCarta(c, extra = "", attrs = "") {
+  if (c.tipo === "num") {
+    return `<button class="carta c-${c.color} ${extra}" ${attrs} aria-label="${esc(CAT_SINGULAR[c.color] + ": " + nombreCarta(c))}"><span class="inner">
+      <span class="cat">${CAT_SINGULAR[c.color]}</span><span class="big">${c.valor}</span>
+      <span><span class="nm">${GASTOS[c.color][c.valor - 1]}</span><br><span class="amt">$${c.valor} mil</span></span></span></button>`;
+  }
+  const e = ESPECIALES[c.tipo];
+  return `<button class="carta c-${c.color} ${extra}" ${attrs} aria-label="${esc(e.nombre + ". " + e.efecto)}"><span class="inner">
+    <span class="cat">${CAT_SINGULAR[c.color]}</span><span class="big">${e.simbolo}</span>
+    <span><span class="nm">${e.nombre}</span><br><span class="amt">${e.corto}</span></span></span></button>`;
+}
+
+function render() {
+  if (S.pantalla === "inicio") return renderInicio();
+  renderJuego();
+}
+function renderInicio() {
+  const n = S.config.length;
+  $app.innerHTML = `<div class="portada">
+    <div class="logo"><div class="moneda" aria-hidden="true">¢</div>
+      <div><h1>Céntimo</h1><p>El juego de cartas de tu presupuesto del mes. Paga primero lo necesario, ahorra para los imprevistos y cierra tu mes antes que los demás.</p></div></div>
+    <div class="muestra" aria-hidden="true">
+      ${htmlCarta({ color: "b", tipo: "num", valor: 9 })}${htmlCarta({ color: "r", tipo: "num", valor: 5 })}
+      ${htmlCarta({ color: "g", tipo: "num", valor: 5 })}${htmlCarta({ color: "y", tipo: "num", valor: 4 })}
+      ${htmlCarta({ color: "k", tipo: "deuda" })}
+    </div>
+    <section class="panel" aria-labelledby="t-jug">
+      <h2 id="t-jug">¿Cuántos juegan?</h2>
+      <div class="contador">
+        <button class="btn redondo" id="menos" aria-label="Quitar jugador" ${n <= 2 ? "disabled" : ""}>−</button>
+        <span class="n" aria-live="polite">${n}</span>
+        <button class="btn redondo" id="mas" aria-label="Agregar jugador" ${n >= 10 ? "disabled" : ""}>+</button>
+        <span class="nota">de 2 a 10 jugadores</span>
+      </div>
+      <div class="lista-jug">${S.config.map((c, i) => `
+        <div class="fila-jug">
+          <input id="nombre-${i}" data-i="${i}" value="${esc(c.nombre)}" maxlength="16" aria-label="Nombre del jugador ${i + 1}">
+          <div class="seg" role="group" aria-label="Quién juega">
+            <button data-tipo="${i}" data-bot="0" aria-pressed="${!c.bot}">Persona</button>
+            <button data-tipo="${i}" data-bot="1" aria-pressed="${c.bot}">Compu</button>
+          </div>
+        </div>`).join("")}
+      </div>
+      <p class="nota">Las personas se pasan el mismo celular o computador por turnos. "Compu" es un jugador automático. ${n > 5 ? "Con 6 o más jugadores se usan dos mazos (112 cartas)." : ""}</p>
+      <div class="acciones-inicio">
+        <button class="btn primario" id="empezar">Empezar partida</button>
+        <button class="btn" id="reglas">Cómo se juega</button>
+      </div>
+    </section>
+  </div>`;
+  $app.querySelector("#menos").onclick = () => { S.config.pop(); guardarConfig(); render(); };
+  $app.querySelector("#mas").onclick = () => { S.config.push({ nombre: `Jugador ${S.config.length + 1}`, bot: false }); guardarConfig(); render(); };
+  $app.querySelectorAll("input[data-i]").forEach(inp => inp.oninput = () => { S.config[+inp.dataset.i].nombre = inp.value; guardarConfig(); });
+  $app.querySelectorAll("[data-tipo]").forEach(b => b.onclick = () => { S.config[+b.dataset.tipo].bot = b.dataset.bot === "1"; guardarConfig(); render(); });
+  $app.querySelector("#empezar").onclick = empezarPartida;
+  $app.querySelector("#reglas").onclick = mostrarReglas;
+}
+
+function renderMensaje() {
+  const el = document.getElementById("mensaje");
+  if (!el || !S.mensaje) return;
+  el.className = "mensaje" + (S.mensaje.alerta ? " alerta" : "");
+  el.textContent = S.mensaje.texto;
+}
+
+function renderJuego() {
+  const j = actual();
+  const t = tope();
+  // Mano que se muestra: la del turno (si ya la destapó) o, si hay una sola persona, la suya.
+  let vi = null;
+  if (!j.bot && S.visible) vi = S.turno;
+  else if (humanos() === 1) vi = S.jugadores.findIndex(x => !x.bot);
+  const miTurno = vi === S.turno && !j.bot && S.visible && !S.ocupado;
+  const yo = vi !== null ? S.jugadores[vi] : null;
+  const necAviso = miTurno && yo.hand.some(c => c.color === "b" && puedeJugar(c)) && yo.hand.some(c => c.color === "r" && puedeJugar(c));
+
+  $app.innerHTML = `<div class="juego">
+    <div class="barra">
+      <div class="marca"><span class="moneda" aria-hidden="true">¢</span>Céntimo <span class="ronda">Ronda ${S.ronda}</span></div>
+      <div class="der"><button class="btn chico" id="b-reglas">Reglas</button><button class="btn chico" id="b-salir">Salir</button></div>
+    </div>
+
+    <div class="jugadores" aria-label="Jugadores">${S.jugadores.map((p, i) => `
+      <div class="chip ${i === S.turno ? "activo" : ""}">
+        <span class="nombre">${esc(p.nombre)}</span>
+        <span class="info"><i class="mini"></i>${p.hand.length} ${p.hand.length === 1 ? "carta" : "cartas"}</span>
+        <span class="info">${p.bot ? `<span class="badge bot">Compu</span>` : ""}${p.escudo ? `<span class="badge escudo">Escudo</span>` : ""}${p.hand.length === 1 ? `<span class="badge ultimo">Último gasto</span>` : ""}</span>
+      </div>`).join("")}
+    </div>
+
+    <div class="centro">
+      <div class="pila">
+        <button class="carta dorso" id="b-mazo" ${miTurno ? "" : "disabled"} aria-label="Robar una carta y pasar"><span class="inner"><span class="big">¢</span></span></button>
+        <small>Mazo · ${S.mazo.length}</small>
+      </div>
+      <div class="descarte">${htmlCarta(t, "grande", 'tabindex="-1" aria-disabled="true"')}<small>Carta en juego</small></div>
+      <div class="estado">
+        <span class="color-actual c-${S.color}"><i></i>Color: ${COLORES[S.color].nombre}</span>
+        <span class="sentido">Sentido: ${S.sentido === 1 ? "→ hacia la derecha" : "← hacia la izquierda"}</span>
+      </div>
+    </div>
+
+    <div class="mensaje ${S.mensaje && S.mensaje.alerta ? "alerta" : ""}" id="mensaje" aria-live="polite">${esc(S.mensaje ? S.mensaje.texto : "")}</div>
+
+    <section class="zona-mano" aria-label="Tu mano">
+      ${yo ? `
+        <div class="titulo"><h2>Cartas de ${esc(yo.nombre)}</h2>
+          ${miTurno ? `<p class="pista">Juega color <b>${COLORES[S.color].nombre}</b>${t.tipo === "num" ? ` o número <b>${t.valor}</b>` : ""}, o un comodín.</p>` : `<p class="pista">Espera tu turno…</p>`}
+        </div>
+        ${miTurno && acusacionValida() ? `<div class="acusar"><p><b>${esc(S.jugadores[S.acusable].nombre)}</b> quedó con una carta y no dijo "¡Último gasto!".</p><button class="btn peligro chico" id="b-acusar">Acusar: roba 2</button></div>` : ""}
+        ${necAviso ? `<div class="aviso-nec">Necesidades primero: tienes una carta azul que puedes pagar antes que tus Gustos.</div>` : ""}
+        <div class="mano">${yo.hand.map((c, i) => {
+          const cls = miTurno ? (puedeJugar(c) ? "jugable" : "nojugable") : "";
+          return htmlCarta(c, cls + (c.id === S.nuevaCarta ? " nueva" : ""), `data-c="${i}" ${miTurno ? "" : 'tabindex="-1"'}`);
+        }).join("")}</div>
+        ${miTurno ? `<div class="acciones">
+          <button class="btn" id="b-robar">Robar carta y pasar</button>
+          <button class="btn ${yo.dijo ? "dicho" : "primario"}" id="b-ultimo" ${yo.hand.length === 2 ? "" : "disabled"}>${yo.dijo ? "Dijiste: ¡Último gasto!" : "¡Último gasto!"}</button>
+        </div>` : ""}`
+      : `<p class="espera">Las cartas están ocultas hasta que el próximo jugador las destape.</p>`}
+    </section>
+
+    <ul class="bitacora" aria-label="Lo que ha pasado">${S.bitacora.slice(0, 5).map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+  </div>`;
+
+  $app.querySelector("#b-reglas").onclick = mostrarReglas;
+  $app.querySelector("#b-salir").onclick = () => modal(`<h2>¿Salir de la partida?</h2><p>Se perderá la ronda en curso.</p>`,
+    [{ txt: "Seguir jugando", cls: "primario", fn: cerrarCapa },
+     { txt: "Salir", cls: "peligro", fn: () => { clearTimeout(reloj); cerrarCapa(); S.pantalla = "inicio"; render(); } }]);
+  if (miTurno) {
+    $app.querySelectorAll("[data-c]").forEach(el => el.onclick = () => tocarCarta(+el.dataset.c, el));
+    $app.querySelector("#b-mazo").onclick = robarYPasar;
+    $app.querySelector("#b-robar").onclick = robarYPasar;
+    $app.querySelector("#b-ultimo").onclick = () => { yo.dijo = true; S.mensaje = { texto: `${yo.nombre}: "¡Último gasto!" Ahora juega tu penúltima carta.` }; render(); };
+    const ba = $app.querySelector("#b-acusar");
+    if (ba) ba.onclick = acusar;
+  }
+}
+
+render();
+</script>
+</body>
+</html>

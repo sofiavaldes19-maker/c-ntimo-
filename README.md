@@ -2,6 +2,16 @@
 
 Juego de cartas de finanzas personales al estilo UNO, hecho a partir de la *Ficha de Diseño del Prototipo* del equipo FinTeam.
 
+## Instalar como app
+
+Céntimo es una app web instalable (PWA): una vez publicada en internet (por ejemplo con GitHub Pages), se instala desde el navegador, aparece con su ícono en la pantalla de inicio, se abre a pantalla completa y funciona sin internet.
+
+- **iPhone / iPad (Safari):** botón Compartir → *Agregar a inicio*.
+- **Android (Chrome):** menú ⋮ → *Instalar app*.
+- **Computador (Chrome / Edge):** ícono de instalar en la barra de direcciones.
+
+También hay un botón **Instalar app** en la pantalla de inicio del juego.
+
 ## Cómo jugar
 
 1. Abre `index.html` en cualquier navegador (celular o computador). No necesita instalación.

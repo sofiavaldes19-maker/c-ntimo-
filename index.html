@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Céntimo</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#151a2c">
+<meta name="description" content="Céntimo: juego de cartas de finanzas personales para 2 a 10 jugadores.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="iconos/favicon-32.png">
+<link rel="apple-touch-icon" href="iconos/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Céntimo">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@400;600;700&display=swap">
@@ -191,6 +200,7 @@ h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
 .caja { background: var(--mesa-2); border: 1px solid var(--linea); border-radius: 20px; padding: 22px; width: min(560px, 100%); display: grid; gap: 14px; }
 .caja h2 { font-size: 26px; }
 .caja p { margin: 0; }
+.caja ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
 .caja .botones { display: flex; gap: 10px; flex-wrap: wrap; }
 .caja .botones .btn { flex: 1 1 160px; }
 .cortina .caja { text-align: center; justify-items: center; }
@@ -605,6 +615,7 @@ function renderInicio() {
       <div class="acciones-inicio">
         <button class="btn primario" id="empezar">Empezar partida</button>
         <button class="btn" id="reglas">Cómo se juega</button>
+        ${puedeInstalar() ? `<button class="btn" id="instalar">Instalar app</button>` : ""}
       </div>
     </section>
   </div>`;
@@ -614,6 +625,8 @@ function renderInicio() {
   $app.querySelectorAll("[data-tipo]").forEach(b => b.onclick = () => { S.config[+b.dataset.tipo].bot = b.dataset.bot === "1"; guardarConfig(); render(); });
   $app.querySelector("#empezar").onclick = empezarPartida;
   $app.querySelector("#reglas").onclick = mostrarReglas;
+  const bi = $app.querySelector("#instalar");
+  if (bi) bi.onclick = instalarApp;
 }
 
 function renderMensaje() {
@@ -695,6 +708,31 @@ function renderJuego() {
     const ba = $app.querySelector("#b-acusar");
     if (ba) ba.onclick = acusar;
   }
+}
+
+/* ================= App instalable ================= */
+let avisoInstalar = null;
+const esApp = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+const enMarco = () => { try { return window.self !== window.top; } catch (e) { return true; } };
+function puedeInstalar() { return !esApp() && !enMarco() && location.protocol !== "file:"; }
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); avisoInstalar = e; });
+window.addEventListener("appinstalled", () => { avisoInstalar = null; if (S.pantalla === "inicio") render(); });
+function instalarApp() {
+  if (avisoInstalar) {
+    avisoInstalar.prompt();
+    avisoInstalar.userChoice.finally(() => { avisoInstalar = null; });
+    return;
+  }
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  modal(`<h2>Instalar Céntimo</h2>
+    ${ios
+      ? `<p>En iPhone o iPad, desde <b>Safari</b>:</p><ol><li>Toca el botón <b>Compartir</b> (el cuadrado con una flecha hacia arriba).</li><li>Elige <b>Agregar a inicio</b>.</li><li>Toca <b>Agregar</b>.</li></ol>`
+      : `<p>En Android, desde <b>Chrome</b>:</p><ol><li>Toca el menú <b>⋮</b> arriba a la derecha.</li><li>Elige <b>Instalar app</b> o <b>Agregar a la pantalla principal</b>.</li></ol><p>En computador, busca el ícono de instalar en la barra de direcciones.</p>`}
+    <p class="nota">Céntimo aparecerá con su ícono junto a tus otras apps y funcionará sin internet.</p>`,
+    [{ txt: "Entendido", cls: "primario", fn: cerrarCapa }]);
+}
+if ("serviceWorker" in navigator && location.protocol !== "file:" && !enMarco()) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
 
 render();
